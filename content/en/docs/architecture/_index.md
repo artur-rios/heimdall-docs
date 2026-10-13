@@ -60,7 +60,7 @@ flowchart TB
   `X-Heimdall-Caller-Key` and `X-Heimdall-Client-Address` so that the rate
   limiter counts each of its users under their own address instead of counting
   them all under the client system's address. How a client system connects is
-  covered in the Integrating a client system section.
+  covered in the [Integrating a client system]({{< relref "/docs/integrating" >}}) section.
 - **PostgreSQL** is the only data store, in every environment. The API reaches it
   through EF Core.
 - **Google Identity** is used for Google Sign-In. The UI obtains a Google ID

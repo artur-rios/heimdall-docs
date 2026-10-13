@@ -19,9 +19,9 @@ detailed documentation, and these pages link to it rather than copy it.
 | Section | What it covers |
 | --- | --- |
 | [Overview]({{< relref "/docs/overview" >}}) | What Heimdall is, what it is not, and the concepts the rest of the documentation assumes. |
-| Architecture | How the API and the UI are built, and how they talk to each other. |
-| Installation | What you need and the commands to run the API and the UI. |
-| User guide | How to use the interface, task by task, by role. |
-| Integrating a client system | What a system that delegates its identities to Heimdall has to do. |
-| API documentation | A map of the API's endpoints and a pointer to its reference, explorer and specification. |
-| Repositories | The two repositories, their releases and the specification documents. |
+| [Architecture]({{< relref "/docs/architecture" >}}) | How the API and the UI are built, and how they talk to each other. |
+| [Installation]({{< relref "/docs/installation" >}}) | What you need and the commands to run the API and the UI. |
+| [User guide]({{< relref "/docs/user-guide" >}}) | How to use the interface, task by task, by role. |
+| [Integrating a client system]({{< relref "/docs/integrating" >}}) | What a system that delegates its identities to Heimdall has to do. |
+| [API documentation]({{< relref "/docs/api" >}}) | A map of the API's endpoints and a pointer to its reference, explorer and specification. |
+| [Repositories]({{< relref "/docs/repositories" >}}) | The two repositories, their releases and the specification documents. |

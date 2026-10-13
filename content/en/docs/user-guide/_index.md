@@ -40,7 +40,7 @@ diagram of the same rules.
 | Pages | System Admin | Scope Admin | User | Not signed in | Restricted session |
 | --- | --- | --- | --- | --- | --- |
 | Sign in | Not offered once signed in | Not offered once signed in | Not offered once signed in | Full | Not offered |
-| Second-factor challenge | Only with a held challenge, which exists only while signing in | Only with a held challenge | Only with a held challenge | Only with a held challenge | Not offered |
+| Second-factor challenge | Not offered once signed in | Not offered once signed in | Not offered once signed in | Only with a held challenge | Not offered |
 | Password recovery, password reset, email verification | Full | Full | Full | Full | Not offered |
 | Privacy notice | Full | Full | Full | Full | Full |
 | Home | Full | Full | Full | Not offered | Not offered |

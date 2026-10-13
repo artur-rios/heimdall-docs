@@ -15,3 +15,6 @@ docs/user-guide/persons/
 docs/user-guide/applications/
 docs/user-guide/permissions/
 docs/user-guide/google-users/
+docs/integrating/
+docs/api/
+docs/repositories/

@@ -42,8 +42,8 @@ self-registration.
   available to persons only.
 - **Not a replacement for a WAF or an API gateway.** The API's rate limiter is a
   per-instance, defence-in-depth throttle.
-- **Not self-updating.** No UI target updates itself. Distribution and update are
-  the operator's responsibility.
+- **Not self-updating.** No desktop or Android target updates itself.
+  Distribution and update are the operator's responsibility.
 - **Not shipped signed or packaged.** Windows and Linux builds are unsigned by
   default, and signing and packaging them (MSIX, AppImage, deb) is a deployment
   decision outside the repository. Android release builds need a signing
@@ -134,12 +134,12 @@ rules are in the API's
 
 ## Where to go next
 
-- To see how the pieces fit together, read **Architecture**.
-- To run the API and the UI, read **Installation**.
-- To use the interface, read the **User guide**.
-- To connect a system to Heimdall, read **Integrating a client system**.
-- For the endpoints, the generated reference and the specification, read **API documentation**.
-- For the source, the releases and the specification documents, read **Repositories**.
+- To see how the pieces fit together, read [Architecture]({{< relref "/docs/architecture" >}}).
+- To run the API and the UI, read [Installation]({{< relref "/docs/installation" >}}).
+- To use the interface, read the [User guide]({{< relref "/docs/user-guide" >}}).
+- To connect a system to Heimdall, read [Integrating a client system]({{< relref "/docs/integrating" >}}).
+- For the endpoints, the generated reference and the specification, read [API documentation]({{< relref "/docs/api" >}}).
+- For the source, the releases and the specification documents, read [Repositories]({{< relref "/docs/repositories" >}}).
 
 The [Heimdall API documentation](https://artur-rios.github.io/heimdall-api/docs/)
 holds the detailed rules behind everything summarised here.
