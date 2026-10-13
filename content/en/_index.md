@@ -56,7 +56,7 @@ and Android. What each person sees follows their role.
 {{% /blocks/feature %}}
 
 {{% blocks/feature icon="fa-solid fa-scale-balanced" title="Open source" url="https://github.com/artur-rios/heimdall-api/blob/develop/LICENSE" %}}
-The default branch of both repositories is under the Artur Rios Attribution
+The default branch of both code repositories is under the Artur Rios Attribution
 License. The licence file has the terms.
 {{% /blocks/feature %}}
 

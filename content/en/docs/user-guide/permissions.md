@@ -6,7 +6,7 @@ description: >
   Browse, create, update and delete the named permissions of a scope, and choose whether each one goes into tokens.
 ---
 
-A scope can define named permissions, each with a description and a flag saying
+A scope can define named permissions, each with an optional description and a flag saying
 whether it is included in tokens as a claim. When a token is issued, the names of
 the flagged permissions are added to it, so a client system can read them without
 asking the API again. The claim is a snapshot, so a change shows up in tokens
@@ -41,8 +41,8 @@ Screen: `/scopes/:scopeId/permissions/new`. A Scope Admin can only create within
 scope they own.
 
 1. Press **New permission**.
-2. Enter a name and a description, and choose whether the permission is included
-   in tokens with the **Include in tokens** switch.
+2. Enter a name, add a description if you want one, and choose whether the
+   permission is included in tokens with the **Include in tokens** switch.
 3. Press **Create permission**.
 4. The API creates it. The UI confirms and opens its detail.
 

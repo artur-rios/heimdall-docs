@@ -56,7 +56,7 @@ flowchart TB
   authorization. A client system calls it to authenticate its users and to query
   persons. For Fortuna, the sources add two details: in each VPS environment
   `fortuna-api` is given the same `HEIMDALL_AUTH_TOKEN_SECRET` value as that
-  environment's Heimdall API, and Heimdall 1.4.0 lets a client system send
+  environment's Heimdall API, and API 1.4.0 lets a client system send
   `X-Heimdall-Caller-Key` and `X-Heimdall-Client-Address` so that the rate
   limiter counts each of its users under their own address instead of counting
   them all under the client system's address. How a client system connects is

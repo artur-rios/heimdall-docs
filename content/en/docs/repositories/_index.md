@@ -100,6 +100,6 @@ The board and the milestone pages show the current state. The READMEs of the
 repositories carry their own status tables, but GitHub is the source of truth, so
 this site does not repeat progress counts that would go stale.
 
-Each issue moves from its first status through In Progress and Testing to Done,
+Each issue moves from Todo through In Progress and Testing to Done,
 and each use case ships on its own branch, issue and pull request, as the Development
 Workflow Documents describe.

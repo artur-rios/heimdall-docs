@@ -115,8 +115,7 @@ Permanent deletion:
 Other things that can happen:
 
 - **You cancel.** The dialog closes and nothing is sent.
-- **The API refuses.** For example, the scope still holds users. Its messages are
-  shown and the scope stays open.
+- **The API refuses.** Its messages are shown and the scope stays open.
 - **The typed name does not match.** The confirm button stays disabled.
 - **The scope is already deleted.** The UI treats it as done and returns to a
   refreshed list.

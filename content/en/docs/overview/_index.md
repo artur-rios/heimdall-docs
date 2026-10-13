@@ -69,7 +69,7 @@ scope and governs the whole system; since API 1.2.0 a System Admin may also own 
 scope. A **Scope Admin** owns one or more scopes, manages the users and
 applications in them, and can add co-owners. A Scope Admin who owns no live scope
 cannot sign in. A **User** belongs to exactly one scope and can sign in, view
-their own profile, recover a password and verify an email address. The
+and update their own profile, recover a password and verify an email address. The
 authorization matrix is in the API's
 [system requirements](https://artur-rios.github.io/heimdall-api/docs/requirements/system-requirements-document/).
 
