@@ -5,3 +5,13 @@ docs/overview/
 about/
 docs/architecture/
 docs/installation/
+docs/user-guide/
+docs/user-guide/signing-in/
+docs/user-guide/password-and-email/
+docs/user-guide/restricted-sessions/
+docs/user-guide/your-account/
+docs/user-guide/scopes/
+docs/user-guide/persons/
+docs/user-guide/applications/
+docs/user-guide/permissions/
+docs/user-guide/google-users/
