@@ -1,3 +1,5 @@
 # Pages that must be built, relative to the site root. Later tasks append.
 
 docs/
+docs/overview/
+about/
