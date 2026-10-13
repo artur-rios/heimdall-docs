@@ -47,8 +47,9 @@ flowchart TB
     ygg -.->|"deploys"| ui
 ```
 
-- **Heimdall UI** is the interface for the three roles. It talks only to the
-  API, over HTTPS with a bearer token. On the web, a client system opens the UI
+- **Heimdall UI** is the interface for the three roles. It talks to the
+  API over HTTPS with a bearer token, and to Google Identity only to obtain an
+  ID token for Google Sign-In. On the web, a client system opens the UI
   and names the scope it wants to act in (see [Configuration](#configuration-and-secure-storage)
   below).
 - **Heimdall API** is the system of record and the only authority on data and
@@ -109,7 +110,7 @@ flowchart TB
 
     pres -->|"commands and queries<br/>through two mediators"| app
     app --> dom
-    app -->|"repository interfaces"| infra
+    app -->|"repository interfaces,<br/>implemented by"| infra
     infra --> dom
     infra --> pg
     pres -.->|"supplies token, email and<br/>Google adapters"| app
@@ -122,11 +123,13 @@ flowchart TB
 | **Infrastructure** | `AppDbContext`, the entity maps, the migrations and the database seeder, over PostgreSQL. |
 | **Presentation** | The controllers, JWT issuing and validation, the filters, the email and Google adapters, and start-up. |
 
-The arrows point inwards. The application layer reaches the database only
-through repository interfaces that Infrastructure implements, and Presentation
-supplies the adapters for the abstractions the application layer declares.
-Every write handler is wrapped by an auditing decorator that writes one audit
-log row.
+The arrows only ever point inwards or sideways: Domain depends on nothing.
+The application layer depends on Infrastructure only through repository
+interfaces that Infrastructure implements, and Presentation supplies the
+adapters for the abstractions the application layer declares. Every write
+handler is wrapped by an auditing decorator that writes one audit log row per
+successful command. A failure to write that row is logged as a warning and
+never fails the request.
 
 The API's own [Architecture page](https://artur-rios.github.io/heimdall-api/docs/architecture/)
 goes further: the CQRS mediators, the auditing decorator and the HTTP request
@@ -252,7 +255,7 @@ flowchart TD
     anon["Not signed in<br/>sign in, password recovery and reset,<br/>email verification, privacy notice"]
     role{"Role in the session"}
     sa["System Admin<br/>all scopes: create, update, delete<br/>owners and Google Sign-In toggle<br/>persons, applications, permissions,<br/>Google users, including permanent delete<br/>health and diagnostics, full"]
-    sc["Scope Admin<br/>owned scopes only: view, owners,<br/>Google Sign-In toggle, scope name read-only<br/>persons, applications, permissions,<br/>Google users, no permanent delete<br/>health and diagnostics, read-only"]
+    sc["Scope Admin<br/>owned scopes only: view, owners,<br/>Google Sign-In toggle, scope name and description read-only<br/>persons, applications, permissions,<br/>Google users, no permanent delete<br/>health and diagnostics, read-only"]
     usr["User<br/>home, own profile and security<br/>no administration screens"]
     rs["Restricted session, any role<br/>only the restricted-session screen<br/>and the privacy notice"]
     auth["Heimdall API<br/>the sole authority:<br/>it refuses what the caller may not do,<br/>whatever the UI offered"]
