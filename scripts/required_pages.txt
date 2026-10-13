@@ -4,3 +4,4 @@ docs/
 docs/overview/
 about/
 docs/architecture/
+docs/installation/
