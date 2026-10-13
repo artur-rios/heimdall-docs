@@ -77,6 +77,11 @@
     .td-arrow-down::before {
       border-color: var(--bs-tertiary-bg) transparent transparent transparent;
     }
+
+    // Links inside the band keep the light-mode blue otherwise (about 2.8:1 on the raised surface).
+    a:not(.btn) {
+      color: var(--bs-link-color);
+    }
   }
 }
 
