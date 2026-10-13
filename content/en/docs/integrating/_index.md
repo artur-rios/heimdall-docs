@@ -45,7 +45,9 @@ Each is off or unset until someone sets it.
   `PUT /api/scopes/{id}/email-links`. Each must be an absolute `http` or `https`
   URL of at most 2048 characters, and the token is appended as a `token` query
   parameter. Those screens post the token back to `POST /api/auth/verify-email`
-  and `POST /api/auth/password-reset`.
+  and `POST /api/auth/password-reset`. The links apply only to that scope's
+  Users. Administrators have no scope, so their emails always use the global
+  links, and a Google user receives neither email.
 
 Someone has to set the scope up first. A System Admin creates it with at least
 one owner, and its owners then create the persons, applications and permissions,
@@ -96,8 +98,10 @@ sequenceDiagram
   token is accepted only by `POST /api/auth/2fa/verify`, and it can be redeemed
   once. The details are in the API's
   [two-factor flow](https://artur-rios.github.io/heimdall-api/docs/flows/two-factor/).
-- **Google.** A person of a scope that has switched Google Sign-In on signs in
-  with `POST /api/auth/google`. See the API's
+- **Google.** When a scope has switched Google Sign-In on, its people can sign
+  in with Google through `POST /api/auth/google`. That makes them **Google
+  users**, a separate kind of identity from persons: they always have the User
+  role, belong to one scope and have no password. See the API's
   [Google sign-in flow](https://artur-rios.github.io/heimdall-api/docs/flows/google-sign-in/).
 - **Restricted identities.** An identity whose processing has been restricted can
   still sign in, but receives a subject-rights-only token that only a few
@@ -111,17 +115,21 @@ The login sequence, step by step, is in the API's
 The token is a stateless signed JWT. Heimdall keeps no revocation list, so a
 token is good until it expires. The one exception is on Heimdall's own side:
 its API refuses a token whose identity has since been deleted or restricted. A
-client system that validates tokens itself does not get that check. The lifetime is set by the operator with
-`HEIMDALL_AUTH_TOKEN_EXPIRATION_IN_SECONDS`, which defaults to `3600` (one hour).
+client system that validates tokens itself does not get that check. The
+lifetime is set by the operator with
+`HEIMDALL_AUTH_TOKEN_EXPIRATION_IN_SECONDS`, which defaults to `3600` (one
+hour).
 
 | Claim | Present for |
 | --- | --- |
 | `id` | Everyone. The person's public ID. |
 | `roleId` | Everyone. |
+| `name` | The caller's display name, when there is one. |
 | `scopeId` | Users only. |
 | `ownedScopeIds` | Scope Admins only, comma-separated. |
 | `scopePermissions` | A JSON array of permission names, when the scope has permissions flagged `IncludeAsJwtClaim`. |
 | `mfaPending` | Challenge tokens only. |
+| `challengeId` | Challenge tokens only, beside `mfaPending`. |
 | `subjectRightsOnly` | Restricted sign-ins only. |
 
 Claims are left out rather than sent empty, and every value is a public ID, never
@@ -143,9 +151,14 @@ configuration they were issued with. The Heimdall API signs every token with
 environment the `fortuna-api` of that environment is given the same value. The
 issuer and audience are `HEIMDALL_AUTH_TOKEN_ISSUER` and
 `HEIMDALL_AUTH_TOKEN_AUDIENCE`. To rotate the secret without invalidating tokens
-in flight, the operator sets `HEIMDALL_AUTH_TOKEN_SECRET_PREVIOUS` to the old
-secret, waits one token lifetime, and then clears it. The procedure is in the API's
-[operations](https://artur-rios.github.io/heimdall-api/docs/operations/) page.
+in flight, the operator sets `HEIMDALL_AUTH_TOKEN_SECRET_PREVIOUS` to the
+secret currently in use, sets `HEIMDALL_AUTH_TOKEN_SECRET` to a new one and
+restarts. After one token lifetime, the operator clears
+`HEIMDALL_AUTH_TOKEN_SECRET_PREVIOUS` and restarts again. A client system that
+validates tokens itself, as Fortuna does, has to be given the new secret too,
+or it will refuse the tokens Heimdall signs with it. The steps are in the API's
+[rotating the signing secret](https://artur-rios.github.io/heimdall-api/docs/operations/#rotating-the-signing-secret)
+section.
 How the shared secret fits into the deployment is described in the
 [Architecture]({{< relref "/docs/architecture" >}}) page, so it is not repeated
 here.
@@ -156,8 +169,8 @@ A client system signs its users in **on their behalf**, from its own server.
 Heimdall therefore sees one address, the client system's, for all of them. The
 anonymous, credential-checking endpoints (login, password recovery, password
 reset, email verification, Google sign-in, and second-factor verification and
-resend) allow 10 requests per minute per client address, so every user of the client system ends up sharing a single
-budget of ten.
+resend) allow 10 requests per minute per client address, so every user of the
+client system ends up sharing a single budget of ten.
 
 The caller key lets the client system say whose request it is. Heimdall then
 counts the request under that user's address instead.
@@ -236,7 +249,7 @@ flowchart LR
   revoked at Heimdall stays acceptable to Fortuna until it expires, which is why
   the token lifetime is configurable.
 - **Claims it reads.** The identity mapper in `fortuna-api` reads the claims `id`,
-  `roleId`, `scopeId` and `scopePermissions` from the token.
+  `roleId`, `name`, `scopeId` and `scopePermissions` from the token.
 - **The caller key is optional.** When `FORTUNA_HEIMDALL_CALLER_KEY` is set, to
   one of Heimdall's `HEIMDALL_TRUSTED_CALLER_KEYS`, every request `fortuna-api`
   makes to Heimdall on behalf of a user carries `X-Heimdall-Caller-Key` and

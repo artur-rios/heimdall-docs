@@ -24,4 +24,4 @@ detailed documentation, and these pages link to it rather than copy it.
 | [User guide]({{< relref "/docs/user-guide" >}}) | How to use the interface, task by task, by role. |
 | [Integrating a client system]({{< relref "/docs/integrating" >}}) | What a system that delegates its identities to Heimdall has to do. |
 | [API documentation]({{< relref "/docs/api" >}}) | A map of the API's endpoints and a pointer to its reference, explorer and specification. |
-| [Repositories]({{< relref "/docs/repositories" >}}) | The two repositories, their releases and the specification documents. |
+| [Repositories]({{< relref "/docs/repositories" >}}) | The repositories behind Heimdall, their releases and the specification documents. |
