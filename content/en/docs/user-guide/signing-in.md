@@ -87,10 +87,10 @@ Signing in:
 4. The API answers with a Heimdall token. The UI stores it, starts your session
    and takes you onward.
 
-Signing out:
+Signing out: every signed-in role signs out with the **Sign out** icon in the top
+bar of any signed-in screen. For a Google user the steps are:
 
-1. A Google user presses the **Sign out** icon in the top bar of any signed-in
-   screen.
+1. Press the **Sign out** icon.
 2. The UI tells the API, clears the local Google session, discards the token and
    returns to the sign-in screen.
 

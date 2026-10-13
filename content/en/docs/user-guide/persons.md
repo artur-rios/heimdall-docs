@@ -113,6 +113,8 @@ Other things that can happen:
 - **The API refuses.** For example, the person is the last owner of a scope. Its
   messages are shown and the person stays open.
 - **The typed email does not match.** The confirm button stays disabled.
-- **It is your own record.** The deletion controls are disabled, and the screen says
-  you cannot delete your own account from here.
+- **It is your own record.** A System Admin sees the deletion controls disabled,
+  and the screen says you cannot delete your own account from here. A Scope Admin
+  does not see the deletion section at all on their own record, because a Scope
+  Admin may only delete Users.
 - **You are a Scope Admin.** You never see the permanent deletion control.

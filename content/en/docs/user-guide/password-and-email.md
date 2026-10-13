@@ -10,9 +10,9 @@ These three tasks are reached from links, mostly in emails the API sends. They
 are public: you do not need to be signed in to recover a password or to open a
 verification link.
 
-**Who can reach it:** anyone who is not signed in. Verifying an email address
-and asking for a new verification email also work for a signed-in person, and
-asking for a new email needs a signed-in session (see below).
+**Who can reach it:** anyone, signed in or not. These screens stay open when you
+have a session. Asking for a new verification email needs a signed-in session
+(see below). A restricted session cannot open them.
 
 ## UI-03: Request password recovery
 

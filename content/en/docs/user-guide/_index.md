@@ -39,8 +39,11 @@ diagram of the same rules.
 
 | Pages | System Admin | Scope Admin | User | Not signed in | Restricted session |
 | --- | --- | --- | --- | --- | --- |
-| Signing in; password and email | Not offered once signed in | Not offered once signed in | Not offered once signed in | Full | Not offered |
-| Second-factor challenge | Full | Full | Full | Only with a held challenge | Not offered |
+| Sign in | Not offered once signed in | Not offered once signed in | Not offered once signed in | Full | Not offered |
+| Second-factor challenge | Only with a held challenge, which exists only while signing in | Only with a held challenge | Only with a held challenge | Only with a held challenge | Not offered |
+| Password recovery, password reset, email verification | Full | Full | Full | Full | Not offered |
+| Privacy notice | Full | Full | Full | Full | Full |
+| Home | Full | Full | Full | Not offered | Not offered |
 | Restricted sessions | Not offered | Not offered | Not offered | Not offered | Full |
 | Your account (profile, two-factor) | Full | Full | Full | Not offered | Not offered |
 | Scopes: listing, detail, owners, Google Sign-In switch | All scopes | Owned scopes only | Not offered | Not offered | Not offered |
@@ -49,6 +52,7 @@ diagram of the same rules.
 | Persons, applications, permissions: list, create, update, delete | Full | Owned scopes only | Not offered | Not offered | Not offered |
 | Google users: list, detail, delete | Full | Owned scopes only | Not offered | Not offered | Not offered |
 | Any permanent delete (person, application, permission, Google user) | Full | Not offered | Not offered | Not offered | Not offered |
+| Health and diagnostics | Full | Read-only | Not offered | Not offered | Not offered |
 
 "Not offered" means the screen or control is hidden, or a screen says it is not
 available for your role. "Owned scopes only" means the screen works for the
