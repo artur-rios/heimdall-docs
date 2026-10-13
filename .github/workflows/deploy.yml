@@ -82,8 +82,15 @@ jobs:
         run: python3 -m unittest discover -s scripts -p "test_*.py"
 
       # Required pages, internal links and anchors, unexpected Hugo
-      # warnings, and placeholder text.
+      # warnings, and placeholder text. The published build uses the Pages
+      # base URL, so the checker is given that one; a pull request builds
+      # with the baseURL in hugo.toml, which the checker reads by default.
       - name: Check the site
+        if: github.event_name != 'pull_request'
+        run: python3 scripts/check_site.py --public public --build-log hugo.log --base-url "${{ steps.pages.outputs.base_url }}/"
+
+      - name: Check the site (pull request)
+        if: github.event_name == 'pull_request'
         run: python3 scripts/check_site.py --public public --build-log hugo.log
 
       - name: Upload the artifact
