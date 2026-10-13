@@ -3,13 +3,17 @@
 
 It fails when:
 
-1. a page listed in scripts/required_pages.txt was not built;
-2. an internal link or asset does not resolve to a built file, points
+1. there is no built site (public/index.html is missing), or the file that
+   lists the required pages (scripts/required_pages.txt) cannot be found;
+2. a page listed in scripts/required_pages.txt was not built;
+3. an internal link or asset does not resolve to a built file, points
    outside the site's base path, or names an #anchor the target page
    does not have;
-3. the Hugo build log holds a warning or error other than the two
+4. the Hugo build log holds a warning or error other than the two
    deprecations Docsy v0.15.0 triggers under current Hugo;
-4. the content still holds placeholder text (TODO, TBD, FIXME).
+5. the content directory is missing, or the content still holds
+   placeholder text (the upper-case markers TODO, TBD and FIXME, or
+   "lorem ipsum" in any case).
 
 Usage:
     hugo --minify 2>&1 | tee hugo.log
@@ -33,7 +37,9 @@ KNOWN_DOCSY_WARNINGS = (
     "deprecated: .Site.AllPages",
 )
 
-PLACEHOLDER = re.compile(r"\b(TODO|TBD|FIXME)\b|lorem ipsum", re.IGNORECASE)
+# The markers are case-sensitive on purpose: "Todo" is a real GitHub project
+# status and "to-do" is ordinary prose. Only the shouted forms are leftovers.
+PLACEHOLDER = re.compile(r"\b(?:TODO|TBD|FIXME)\b|(?i:lorem ipsum)")
 LINK_TAGS = {"a", "link", "img", "script", "source", "iframe"}
 SKIPPED_SCHEMES = ("mailto:", "tel:", "javascript:", "data:")
 
@@ -127,7 +133,7 @@ def check_content(content: Path) -> list[str]:
     errors = []
     for md in sorted(content.rglob("*.md")):
         for number, line in enumerate(md.read_text(encoding="utf-8").splitlines(), 1):
-            if PLACEHOLDER.search(line) and not re.search(r"\bto-?do (list|lists)\b", line, re.IGNORECASE):
+            if PLACEHOLDER.search(line):
                 errors.append(f"{md.as_posix()}:{number}: placeholder text: {line.strip()}")
     return errors
 

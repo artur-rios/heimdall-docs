@@ -94,6 +94,26 @@ class CheckContentTests(unittest.TestCase):
             self.assertEqual(len(errors), 1)
             self.assertIn("a.md", errors[0])
 
+    def test_todo_as_a_project_status_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write(Path(tmp), "en/docs/a.md", "Each issue moves from Todo to Done.\n")
+            self.assertEqual(check_site.check_content(Path(tmp)), [])
+
+    def test_uppercase_todo_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write(Path(tmp), "en/docs/a.md", "TODO: write this\n")
+            self.assertEqual(len(check_site.check_content(Path(tmp))), 1)
+
+    def test_uppercase_tbd_and_fixme_fail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write(Path(tmp), "en/docs/a.md", "Size: TBD\n\nFIXME later\n")
+            self.assertEqual(len(check_site.check_content(Path(tmp))), 2)
+
+    def test_lorem_ipsum_fails_in_any_case(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write(Path(tmp), "en/docs/a.md", "lorem ipsum\n\nLorem Ipsum dolor\n")
+            self.assertEqual(len(check_site.check_content(Path(tmp))), 2)
+
     def test_clean_content_passes(self):
         with tempfile.TemporaryDirectory() as tmp:
             # "to-do list" is UI prose, not a placeholder marker.
