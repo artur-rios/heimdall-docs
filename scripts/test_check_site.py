@@ -1,4 +1,6 @@
 """Tests for check_site.py. Run: python -m unittest discover -s scripts -p "test_*.py" """
+import contextlib
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -63,6 +65,12 @@ class CheckPagesTests(unittest.TestCase):
         write(self.public, "index.html", '<a href="https://artur-rios.github.io/heimdall-api/docs/">x</a>')
         self.assertEqual(check_site.check_pages(self.public, BASE, []), [])
 
+    def test_missing_public_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            errors = check_site.check_pages(Path(tmp) / "nope", BASE, [])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("no built site", errors[0])
+
 
 class CheckBuildLogTests(unittest.TestCase):
     def test_known_docsy_deprecations_pass(self):
@@ -91,6 +99,29 @@ class CheckContentTests(unittest.TestCase):
             # "to-do list" is UI prose, not a placeholder marker.
             write(Path(tmp), "en/docs/a.md", "Keep a to-do list of what to read next.\n")
             self.assertEqual(check_site.check_content(Path(tmp)), [])
+
+    def test_missing_content_dir_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            errors = check_site.check_content(Path(tmp) / "nope")
+            self.assertEqual(len(errors), 1)
+
+
+class MainTests(unittest.TestCase):
+    def test_main_fails_without_required_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "public/index.html", "<p>ok</p>")
+            write(root, "content/en/a.md", "Fine.\n")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = check_site.main([
+                    "--public", str(root / "public"),
+                    "--content", str(root / "content"),
+                    "--required", str(root / "missing.txt"),
+                    "--base-url", BASE,
+                ])
+            self.assertEqual(code, 1)
+            self.assertIn("required-pages file not found", out.getvalue())
 
 
 if __name__ == "__main__":

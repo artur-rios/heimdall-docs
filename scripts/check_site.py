@@ -77,6 +77,9 @@ def check_pages(public: Path, base_url: str, required: list[str]) -> list[str]:
     base_path = base.path if base.path.endswith("/") else base.path + "/"
     cache: dict[Path, _Page] = {}
 
+    if not (public / "index.html").is_file():
+        errors.append(f"no built site: {public.as_posix()}/index.html is missing")
+
     for rel in required:
         if not _target_file(public, rel).is_file():
             errors.append(f"required page not built: {rel or '/'}")
@@ -119,6 +122,8 @@ def check_build_log(text: str) -> list[str]:
 
 
 def check_content(content: Path) -> list[str]:
+    if not content.is_dir():
+        return [f"content directory not found: {content.as_posix()}"]
     errors = []
     for md in sorted(content.rglob("*.md")):
         for number, line in enumerate(md.read_text(encoding="utf-8").splitlines(), 1):
@@ -141,11 +146,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base-url")
     args = parser.parse_args(argv)
 
-    required = []
+    errors: list[str] = []
+    required: list[str] = []
     if args.required.is_file():
         required = [line.strip() for line in args.required.read_text(encoding="utf-8").splitlines()
                     if line.strip() and not line.startswith("#")]
-    errors = check_pages(args.public, args.base_url or _base_url_from_config(), required)
+    else:
+        errors.append(f"required-pages file not found: {args.required}")
+    errors += check_pages(args.public, args.base_url or _base_url_from_config(), required)
     if args.build_log:
         errors += check_build_log(args.build_log.read_text(encoding="utf-8", errors="replace"))
     errors += check_content(args.content)
