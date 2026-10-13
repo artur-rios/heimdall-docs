@@ -42,9 +42,13 @@ self-registration.
   available to persons only.
 - **Not a replacement for a WAF or an API gateway.** The API's rate limiter is a
   per-instance, defence-in-depth throttle.
-- **Not self-updating or pre-packaged.** The UI's desktop and Android builds do
-  not update themselves, and signing and packaging them (MSIX, AppImage, deb) is
-  a deployment decision outside the repository.
+- **Not self-updating.** No UI target updates itself. Distribution and update are
+  the operator's responsibility.
+- **Not shipped signed or packaged.** Windows and Linux builds are unsigned by
+  default, and signing and packaging them (MSIX, AppImage, deb) is a deployment
+  decision outside the repository. Android release builds need a signing
+  configuration; without one they are signed with the debug key, which is fine
+  for testing and not for distribution.
 
 ## Concepts
 
@@ -123,7 +127,8 @@ Deletion is either logical or hard. A logical delete sets a flag and keeps the
 row; deleting a scope this way cascades to its users, Google users and
 applications, but not to its owners or its permissions. A hard delete removes the
 row along with the records that depend on it, and only a System Admin can do it.
-A hard delete is rejected if it would leave a scope without an owner. The cascade
+A scope must always keep at least one owner, so removing a scope's last owner, or
+hard-deleting the person who is its last owner, is rejected. The cascade
 rules are in the API's
 [domain model](https://artur-rios.github.io/heimdall-api/docs/domain-model/).
 

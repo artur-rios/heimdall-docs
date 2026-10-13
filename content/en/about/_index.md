@@ -18,7 +18,9 @@ inconsistent security policies and a poor experience for the people signing in.
 Heimdall replaces that with one multi-tenant identity service, with a clear
 boundary around each client system. The API provides it, but on its own it has
 no interface, so every task means composing HTTP requests by hand. Heimdall UI
-puts a task-shaped screen in front of each use case the API exposes.
+puts a task-shaped screen in front of the API's everyday use cases: sign-in,
+your own profile, and administering scopes, persons, applications, permissions
+and Google users.
 {{% /blocks/lead %}}
 
 {{% blocks/section color="dark" type="row" %}}
