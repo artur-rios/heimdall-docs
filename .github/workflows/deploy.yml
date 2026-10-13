@@ -1,0 +1,105 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  # Pull requests build the site but do not publish it. Without this the
+  # repository had no check that ran on a pull request at all, so a broken
+  # site could only be discovered after it was already on main -- and a
+  # required status check had nothing to require.
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deployment finish rather than cancelling it mid-publish.
+# Pull request builds get a group per ref instead, so validating one never
+# queues behind a publish, and pushing to a branch supersedes its own earlier
+# build rather than waiting for it.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('docs-pr-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HUGO_VERSION: 0.165.0
+    steps:
+      - uses: actions/checkout@v4
+
+      # Docsy is a Hugo Module, so resolving the theme needs the Go toolchain.
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Set up Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: ${{ env.HUGO_VERSION }}
+          extended: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # Docsy compiles its SCSS through PostCSS.
+      - name: Install the PostCSS toolchain
+        run: npm ci
+
+      - name: Configure Pages
+        id: pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      # Two build steps rather than one, because the published site needs the
+      # Pages base URL and a pull request has none to ask for. The check that
+      # matters on a pull request is the same either way: does Hugo build it.
+      - name: Build
+        if: github.event_name != 'pull_request'
+        run: hugo --minify --baseURL "${{ steps.pages.outputs.base_url }}/" 2>&1 | tee hugo.log
+
+      - name: Build (pull request)
+        if: github.event_name == 'pull_request'
+        run: hugo --minify 2>&1 | tee hugo.log
+
+      # A build that writes no output is the failure mode the Docsy pin
+      # exists for, and it does not fail the Hugo command -- see the readme.
+      - name: Verify the build produced a site
+        run: test -s public/index.html
+
+      - name: Test the checker
+        run: python3 -m unittest discover -s scripts -p "test_*.py"
+
+      # Required pages, internal links and anchors, unexpected Hugo
+      # warnings, and placeholder text.
+      - name: Check the site
+        run: python3 scripts/check_site.py --public public --build-log hugo.log
+
+      - name: Upload the artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

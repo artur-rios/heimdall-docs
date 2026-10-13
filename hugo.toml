@@ -1,0 +1,104 @@
+baseURL = "https://artur-rios.github.io/heimdall-docs/"
+title = "Heimdall"
+# `locale`, not the deprecated `languageCode` (renamed in Hugo v0.158.0).
+locale = "en-us"
+
+enableGitInfo = false
+enableRobotsTXT = true
+
+# Docsy renders section landing pages from each section's _index.md and
+# needs the section tree, so only taxonomies are excluded.
+disableKinds = ["taxonomy", "term"]
+
+[module]
+  [module.hugoVersion]
+    extended = true
+    # `locale` and `languages.*.label` arrived in 0.158.0.
+    min = "0.158.0"
+  [[module.imports]]
+    path = "github.com/google/docsy"
+
+[markup]
+  [markup.goldmark.renderer]
+    # Docsy's shortcodes emit HTML; Goldmark drops it otherwise.
+    unsafe = true
+  [markup.highlight]
+    # Class-based highlighting so code blocks follow the light/dark mode;
+    # the per-mode stylesheets come from assets/scss/_styles_project.scss.
+    noClasses = false
+    lineNos = false
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 3
+
+[languages]
+  [languages.en]
+    label = "English"
+    contentDir = "content/en"
+    weight = 1
+    title = "Heimdall"
+    [languages.en.params]
+      description = "Centralized identity management with scope-based multi-tenancy — the API and the application that drives it."
+
+[params]
+  copyright.authors = "Artur Rios | [Artur Rios Attribution License](https://github.com/artur-rios/heimdall-docs/blob/main/LICENSE)"
+  github_repo = "https://github.com/artur-rios/heimdall-docs"
+  github_branch = "main"
+  offlineSearch = true
+
+  [params.mermaid]
+    enable = true
+    # Docsy v0.15.0's loader predates Mermaid 12; "latest" would pick it up.
+    version = "11.17.2"
+    # Draw diagrams at natural size; the stylesheet lets wide ones scroll.
+    [params.mermaid.flowchart]
+      useMaxWidth = false
+    [params.mermaid.sequence]
+      useMaxWidth = false
+    [params.mermaid.class]
+      useMaxWidth = false
+    [params.mermaid.state]
+      useMaxWidth = false
+
+  [params.ui]
+    showLightDarkModeMenu = true
+    sidebar_menu_compact = false
+    sidebar_search_disable = false
+    navbar_logo = false
+    breadcrumb_disable = false
+    [params.ui.feedback]
+      enable = false
+
+  [params.links]
+    [[params.links.developer]]
+      name = "heimdall-api"
+      url = "https://github.com/artur-rios/heimdall-api"
+      icon = "fab fa-github"
+      desc = "The ASP.NET Core identity API"
+    [[params.links.developer]]
+      name = "heimdall-ui"
+      url = "https://github.com/artur-rios/heimdall-ui"
+      icon = "fab fa-github"
+      desc = "The Flutter application for web, Windows, Linux and Android"
+    [[params.links.developer]]
+      name = "heimdall-docs"
+      url = "https://github.com/artur-rios/heimdall-docs"
+      icon = "fab fa-github"
+      desc = "This site"
+    [[params.links.user]]
+      name = "API documentation"
+      url = "https://artur-rios.github.io/heimdall-api/"
+      icon = "fa-solid fa-book"
+      desc = "The heimdall-api developer site"
+
+# Documentation and About add themselves from their own front matter.
+[[menu.main]]
+  name = "API site"
+  weight = 30
+  url = "https://artur-rios.github.io/heimdall-api/"
+  pre = "<i class='fa-solid fa-book'></i>"
+[[menu.main]]
+  name = "GitHub"
+  weight = 50
+  url = "https://github.com/artur-rios/heimdall-api"
+  pre = "<i class='fab fa-github'></i>"
