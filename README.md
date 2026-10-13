@@ -26,7 +26,8 @@ package.
 newer — the configuration uses `locale` and `languages.*.label`, which arrived
 in that release; CI builds with 0.165.0 — the [Go toolchain](https://go.dev/dl/)
 — Docsy is consumed as a Hugo Module — and Node with npm, for Docsy's PostCSS
-pipeline. Python 3 is needed only for the checks below.
+pipeline. Python 3.11 or newer is needed only for the checks below (the checker
+imports `tomllib`).
 
 ```bash
 git clone https://github.com/artur-rios/heimdall-docs.git
@@ -35,7 +36,7 @@ npm ci
 hugo server
 ```
 
-The site is then at <http://localhost:1313/>.
+The site is then at <http://localhost:1313/heimdall-docs/>.
 
 To reproduce what CI builds:
 
@@ -71,14 +72,17 @@ heimdall-docs/
 │   └── _styles_project.scss  # light/dark code-block styles, diagrams, tables
 ├── content/en/
 │   ├── _index.md             # landing page
+│   ├── about/                # the about page
 │   └── docs/                 # the documentation
 ├── docs/
-│   └── fact-sheet.md         # the cited facts the pages are written from
+│   ├── fact-sheet.md         # the cited facts the pages are written from
+│   └── superpowers/          # the design spec and the plan the site was built from
 ├── i18n/en.toml              # footer text
 ├── scripts/
 │   ├── check_site.py         # post-build site checker
 │   ├── test_check_site.py    # tests for the checker
 │   └── required_pages.txt    # pages that must be built
+├── LICENSE
 └── .github/workflows/deploy.yml
 ```
 
@@ -91,9 +95,11 @@ alongside it without restructuring.
 theme (`layouts/`, `assets/`) into a git submodule that Go's module zip does
 not include, so it resolves as a Hugo Module but builds no output.
 
-**Re-checked 2026-08-24 against v0.16.0, still the latest release: the fault is
-unchanged.** It resolves, then fails at build with `template for shortcode
-"blocks/cover" not found` and writes no `public/`. The pin stays.
+**v0.16.0 was checked on 2026-08-24, in the sibling alexandria-docs site, and the
+fault was unchanged.** It resolves, then fails at build with `template for
+shortcode "blocks/cover" not found` and writes no `public/`. Later releases
+(v0.18.0 at the time of writing) have not been verified here. The pin stays
+until one is.
 
 Bumping the version therefore needs a real check, not just a green `go get`:
 
