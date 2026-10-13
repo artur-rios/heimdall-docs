@@ -72,10 +72,12 @@ Three things to know before you use one:
 | The pinned EF Core CLI | Restored with `dotnet tool restore` (`dotnet-ef` 10.0.12 in `.config/dotnet-tools.json`). |
 
 Clone the repository. The documentation site's theme is a git submodule, so the
-command below fetches it too. The API itself does not need it.
+command below fetches it too. The API itself does not need it. The commands
+that follow run from the repository root.
 
 ```bash
 git clone --recurse-submodules https://github.com/artur-rios/heimdall-api.git
+cd heimdall-api
 ```
 
 ### Configuration
@@ -145,6 +147,16 @@ already lists that origin. An API run from source does not: its
    cp src/Presentation/ArturRios.Heimdall.WebApi/Environments/.env src/Presentation/ArturRios.Heimdall.WebApi/Environments/.env.local
    ```
 
+   Every line of the tracked template holds a `[[...]]` placeholder, such as
+   `HEIMDALL_TRUSTED_CALLER_KEYS=[[trusted-caller-keys]]`, and the loader
+   takes each line as written. A placeholder left in is not an empty value: it
+   becomes the setting itself. The 23-character trusted-caller placeholder is
+   shorter than the 32 characters a caller key needs, so the API refuses to
+   start; a left-in `MAILGUN_API_KEY=[[mailgun-api-key]]` counts as a key, and
+   the API treats Mailgun as configured once both its key and its domain are
+   non-blank. **Replace every `[[...]]` placeholder with a real value, or
+   clear the line to take the default.**
+
    If a browser UI will call this API, also set
    `HEIMDALL_CORS_ALLOWED_ORIGINS=http://localhost:8081`, the origin the web UI
    is served from in the Run section below. The template leaves it as a
@@ -180,7 +192,7 @@ profile adds `https://localhost:7235`. Swagger UI is at
 
 On the first run against an empty database the seeder creates the three roles
 and the master System Admin from the `HEIMDALL_MASTER_USER_*` settings. Check
-that the API is up, then log in as that user:
+that the API is up:
 
 ```bash
 curl http://localhost:5177/healthcheck
@@ -277,6 +289,7 @@ flutter doctor
 
 ```bash
 git clone https://github.com/artur-rios/heimdall-ui.git
+cd heimdall-ui
 ```
 
 ```bash
@@ -336,7 +349,9 @@ Each command starts the UI from source against the API named in
 `config/local.json`, which holds `http://localhost:8080` unless you change it.
 To run against an API from source on port 5177, edit `HEIMDALL_API_BASE_URL` in
 that file, or replace `--dart-define-from-file=config/local.json` in a command
-with `--dart-define=HEIMDALL_API_BASE_URL=http://localhost:5177`.
+with `--dart-define=HEIMDALL_API_BASE_URL=http://localhost:5177`. Swapping in a
+single `--dart-define` drops any other key you set in `config/local.json`, such
+as the scope id or the Google client id, so pass those too.
 
 ```bash
 flutter run -d chrome --web-port 8081 --dart-define-from-file=config/local.json
