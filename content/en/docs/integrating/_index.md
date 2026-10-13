@@ -63,7 +63,9 @@ UI.
 
 A client system signs a person in by calling Heimdall's login endpoint. Heimdall
 answers with a signed JWT, which the client system then uses as the person's
-credential.
+credential. Every answer arrives inside the `DataOutput` envelope
+(`{success, data, messages, errors, timestamp}`), and the fields shown in the
+diagram below are the ones under `data`.
 
 ```mermaid
 sequenceDiagram
@@ -77,7 +79,7 @@ sequenceDiagram
     alt two-factor authentication is active
         H-->>C: 200 {requiresTwoFactor, challengeToken, availableMethods}
         P->>C: code or recovery code
-        C->>H: POST /api/auth/2fa/verify {challengeToken, code}
+        C->>H: POST /api/auth/2fa/verify {challengeToken, code | recoveryCode}
         H-->>C: 200 {token, expiresAt, emailVerified}
     else no second factor
         H-->>C: 200 {token, expiresAt, emailVerified}

@@ -35,7 +35,7 @@ and does not commit.
 | Section | What it covers |
 | --- | --- |
 | [API reference](https://artur-rios.github.io/heimdall-api/docs/api-reference/) | Every endpoint, the role that may call it, and the use case it implements. |
-| [API Explorer](https://artur-rios.github.io/heimdall-api/docs/api-explorer/) | Swagger UI over the published OpenAPI document. |
+| [API Explorer](https://artur-rios.github.io/heimdall-api/docs/api-explorer/) | Swagger UI over the published OpenAPI document. It is read-only: it shows each operation's request and response shapes but does not send requests. |
 | [OpenAPI document](https://artur-rios.github.io/heimdall-api/openapi/heimdall.json) | The OpenAPI document itself, as raw JSON. |
 
 The API has 61 operations, counted from its controllers; the committed OpenAPI

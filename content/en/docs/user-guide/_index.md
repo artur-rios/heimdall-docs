@@ -115,7 +115,7 @@ copy has 58). For the other rows the UI has no screen that calls them.
 Use the API's [API reference](https://artur-rios.github.io/heimdall-api/docs/api-reference/)
 for who may call each one and what it expects, or the
 [API Explorer](https://artur-rios.github.io/heimdall-api/docs/api-explorer/) to
-try them. Note that the restricted-session screen can lift a restriction
+read their request and response shapes (it does not send requests). Note that the restricted-session screen can lift a restriction
 (UC-45), download your data (UC-41) and request erasure (UC-42), but cannot
 impose a restriction in the first place; that is UC-44, above.
 
