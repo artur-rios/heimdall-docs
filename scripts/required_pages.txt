@@ -3,3 +3,4 @@
 docs/
 docs/overview/
 about/
+docs/architecture/
