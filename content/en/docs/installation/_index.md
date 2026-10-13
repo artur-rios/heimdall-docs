@@ -46,9 +46,9 @@ workflow artifact:
 
 Three things to know before you use one:
 
-- **They are workflow artifacts, not release files.** GitHub offers them to
-  signed-in users on the workflow run's page, and expires them after a
-  retention period, so there is no permanent download link.
+- **They are workflow artifacts, not release files.** GitHub keeps
+  workflow artifacts only for its own retention period, and downloading them
+  needs a GitHub sign-in, so there is no permanent download link.
 - **They point at `http://localhost:8080`.** The workflow supplies no API base
   URL, on purpose, so that no deployment address appears in a public build log.
   The UI's configuration is fixed when it is built (see
@@ -123,7 +123,11 @@ table.
 `HEIMDALL_CORS_ALLOWED_ORIGINS` is empty by default, and an empty value refuses
 every cross-origin request. A UI served to a browser from another origin cannot
 call the API until that origin is listed. Locally the web UI is served from
-`http://localhost:8081`, and the local Compose template already lists it.
+`http://localhost:8081`. The local Compose template (`docker/local.env.example`)
+already lists that origin. An API run from source does not: its
+`Environments/.env.local` is copied from a template in which
+`HEIMDALL_CORS_ALLOWED_ORIGINS` is an unfilled placeholder, so set it to
+`http://localhost:8081` there (see Option A).
 {{% /alert %}}
 
 ### Option A: from source
@@ -140,6 +144,11 @@ call the API until that origin is listed. Locally the web UI is served from
    ```bash
    cp src/Presentation/ArturRios.Heimdall.WebApi/Environments/.env src/Presentation/ArturRios.Heimdall.WebApi/Environments/.env.local
    ```
+
+   If a browser UI will call this API, also set
+   `HEIMDALL_CORS_ALLOWED_ORIGINS=http://localhost:8081`, the origin the web UI
+   is served from in the Run section below. The template leaves it as a
+   placeholder, and an empty value refuses every cross-origin request.
 
    The `ASPNETCORE_ENVIRONMENT` value selects which file is read:
    `Environments/.env.<local|development|staging|production>`, with matching
@@ -315,13 +324,19 @@ who loads the page. Never put a secret in one.
 {{% /alert %}}
 
 For example, the API run from source (Option A above) listens on port 5177
-rather than the UI's default 8080, so a UI run against it is started with
-`--dart-define=HEIMDALL_API_BASE_URL=http://localhost:5177`.
+rather than the UI's default 8080. A UI that calls it needs
+`HEIMDALL_API_BASE_URL=http://localhost:5177`, either passed with
+`--dart-define` instead of `--dart-define-from-file`, or set in
+`config/local.json`. A web UI also needs the API to allow its origin: see the
+CORS step in Option A.
 
 ### Run
 
 Each command starts the UI from source against the API named in
-`config/local.json`:
+`config/local.json`, which holds `http://localhost:8080` unless you change it.
+To run against an API from source on port 5177, edit `HEIMDALL_API_BASE_URL` in
+that file, or replace `--dart-define-from-file=config/local.json` in a command
+with `--dart-define=HEIMDALL_API_BASE_URL=http://localhost:5177`.
 
 ```bash
 flutter run -d chrome --web-port 8081 --dart-define-from-file=config/local.json
@@ -339,9 +354,11 @@ flutter run -d linux --dart-define-from-file=config/local.json
 flutter run -d android --dart-define-from-file=config/local.json
 ```
 
-`--web-port 8081` gives the web page the origin that the local Compose template
-allows through CORS (`http://localhost:8081`). Stop a local heimdall-ui
-container first, because it serves on the same port.
+`--web-port 8081` gives the web page the origin `http://localhost:8081`, which
+the local Compose template allows through CORS. An API run from source allows it
+only if you set `HEIMDALL_CORS_ALLOWED_ORIGINS=http://localhost:8081` in its
+`.env.local`. Stop a local heimdall-ui container first, because it serves on the
+same port.
 
 ### Build
 
