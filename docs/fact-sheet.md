@@ -675,7 +675,8 @@ v1.6.1 (`main`) is still "Proprietary". See §10 item 12.
 Derived from `API/docs/hugo.toml` (`baseURL = 'https://docs.artur-rios.tech/heimdall-api/'`,
 `contentDir = 'content/en'`, mount `requirements` → `content/docs/requirements`, `coverage-report` →
 `static/coverage-report`, `openapi` → `static/openapi`) and the content tree; **every URL below
-returned HTTP 200 on 2026-10-13** (curl check). Requirements pages are slugified file names
+returned HTTP 200 on 2026-10-13** (curl check, before the move to docs.artur-rios.tech: the sites were then on
+GitHub Pages). Requirements pages are slugified file names
 (`Operations & Infrastructure Document.md` has front-matter `slug: "operations-infrastructure-document"`).
 Top nav: Documentation, Requirements, API Explorer, Test Coverage, GitHub.
 
