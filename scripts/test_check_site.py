@@ -7,7 +7,7 @@ from pathlib import Path
 
 import check_site
 
-BASE = "https://artur-rios.github.io/demo-docs/"
+BASE = "https://docs.artur-rios.tech/demo-docs/"
 
 
 def write(root: Path, rel: str, body: str) -> None:
