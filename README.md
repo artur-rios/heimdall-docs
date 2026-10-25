@@ -5,9 +5,12 @@ The home page and documentation portal for
 management system with scope-based multi-tenancy: an ASP.NET Core API and the
 Flutter application that drives it. This site explains what Heimdall is, how it
 is put together, how to run it, and how to use it. The API's internals live on
-the [heimdall-api site](https://artur-rios.github.io/heimdall-api/).
+the [heimdall-api site](https://docs.artur-rios.tech/heimdall-api/).
 
-**[artur-rios.github.io/heimdall-docs](https://artur-rios.github.io/heimdall-docs/)**
+**[docs.artur-rios.tech/heimdall-docs](https://docs.artur-rios.tech/heimdall-docs/)**
+
+The repository lives at <https://git.techcraftsmen.net/artur-rios/heimdall-docs>; the copy on GitHub is a
+read-only mirror.
 
 This repository contains documentation only. It builds no software and ships no
 package.
@@ -24,13 +27,13 @@ package.
 
 **Requirements:** [Hugo extended](https://gohugo.io/installation/) 0.158 or
 newer — the configuration uses `locale` and `languages.*.label`, which arrived
-in that release; CI builds with 0.165.0 — the [Go toolchain](https://go.dev/dl/)
+in that release; the site image builds with 0.165.0 — the [Go toolchain](https://go.dev/dl/)
 — Docsy is consumed as a Hugo Module — and Node with npm, for Docsy's PostCSS
 pipeline. Python 3.11 or newer is needed only for the checks below (the checker
 imports `tomllib`).
 
 ```bash
-git clone https://github.com/artur-rios/heimdall-docs.git
+git clone https://git.techcraftsmen.net/artur-rios/heimdall-docs.git
 cd heimdall-docs
 npm ci
 hugo server
@@ -38,7 +41,7 @@ hugo server
 
 The site is then at <http://localhost:1313/heimdall-docs/>.
 
-To reproduce what CI builds:
+To reproduce what the image builds:
 
 ```bash
 hugo --minify
@@ -46,9 +49,10 @@ hugo --minify
 
 ## Checking it
 
-CI builds the site and then checks it: required pages exist, internal links and
-anchors resolve, Hugo printed no unexpected warnings, and no placeholder text
-is left. To run the same check locally:
+The site image builds the site and then checks it, and a site that fails the
+check is not deployed. The check is that required pages exist, internal links
+and anchors resolve, Hugo printed no unexpected warnings, and no placeholder
+text is left. To run the same check locally:
 
 ```bash
 hugo --minify 2>&1 | tee hugo.log && python scripts/check_site.py --public public --build-log hugo.log
@@ -83,7 +87,10 @@ heimdall-docs/
 │   ├── test_check_site.py    # tests for the checker
 │   └── required_pages.txt    # pages that must be built
 ├── LICENSE
-└── .github/workflows/deploy.yml
+├── Dockerfile                # builds, checks and serves the site
+├── .dockerignore
+├── renovate.json             # dependency updates
+└── .gitattributes
 ```
 
 Content lives under `content/en/` so a `pt-BR` translation can be added
@@ -114,6 +121,19 @@ version is broken the same way v0.16.0 was, and the pin should stay.
 
 ## Deployment
 
-Every push to `main` builds the site and publishes it to GitHub Pages. Pages
-must be configured once, in the repository's Settings → Pages, with **Source**
-set to **GitHub Actions**.
+The site is deployed by Jenkins, from the yggdrasil pipeline: every push to
+`main` builds the `Dockerfile` and deploys the image to production, where it
+is served at <https://docs.artur-rios.tech/heimdall-docs/>. The image answers
+`/healthz` for the status check. The address comes from the build arguments
+`PUBLIC_HOST` and `PUBLIC_PATH`, which the deploy passes, so the `baseURL` in
+`hugo.toml` only matters for `hugo server`.
+
+To build the image locally:
+
+```bash
+docker build -t heimdall-docs \
+  --build-arg PUBLIC_HOST=docs.artur-rios.tech --build-arg PUBLIC_PATH=/heimdall-docs .
+docker run --rm -p 8080:8080 heimdall-docs
+```
+
+The site is then at <http://localhost:8080/heimdall-docs/>.
