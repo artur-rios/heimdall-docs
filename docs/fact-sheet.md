@@ -14,7 +14,7 @@ Compiled 2026-10-13 from local checkouts (read-only) plus `gh` queries. Every fa
   `3cf473a` "release: v1.6.1 (#118)". `develop` is 1 commit ahead of `main`: "chore: adopt the artur
   rios attribution license (#120)", touching `LICENSE`, `README.md`, `api/heimdall.json`,
   `.wakatime-project`. Source: `gh api repos/artur-rios/heimdall-ui/compare/main...develop`).
-- `API-site:` = a page of `API/docs/content/en/docs/…` (published at https://artur-rios.github.io/heimdall-api/).
+- `API-site:` = a page of `API/docs/content/en/docs/…` (published at https://docs.artur-rios.tech/heimdall-api/).
 - `API-req:` = `API/docs/requirements/<file>`; `UI-req:` = `UI/docs/requirements/<file>`.
 
 ---
@@ -670,9 +670,9 @@ v1.6.1 (`main`) is still "Proprietary". See §10 item 12.
 
 ## 9. Deep-link map
 
-### 9.1 API documentation site — https://artur-rios.github.io/heimdall-api/
+### 9.1 API documentation site — https://docs.artur-rios.tech/heimdall-api/
 
-Derived from `API/docs/hugo.toml` (`baseURL = 'https://artur-rios.github.io/heimdall-api/'`,
+Derived from `API/docs/hugo.toml` (`baseURL = 'https://docs.artur-rios.tech/heimdall-api/'`,
 `contentDir = 'content/en'`, mount `requirements` → `content/docs/requirements`, `coverage-report` →
 `static/coverage-report`, `openapi` → `static/openapi`) and the content tree; **every URL below
 returned HTTP 200 on 2026-10-13** (curl check). Requirements pages are slugified file names
@@ -681,43 +681,43 @@ Top nav: Documentation, Requirements, API Explorer, Test Coverage, GitHub.
 
 | URL | Description (front-matter `description` unless noted) |
 | --- | --- |
-| https://artur-rios.github.io/heimdall-api/ | Home: cover, feature blocks (multi-tenant by scope, authentication, identities, getting started, architecture & flows, spec, tests, traceability) |
-| https://artur-rios.github.io/heimdall-api/docs/ | Everything needed to understand, run, test, and extend the Heimdall API |
-| https://artur-rios.github.io/heimdall-api/docs/overview/ | Domain vocabulary — scopes, persons, roles, applications, permissions — and the rules that bind them |
-| https://artur-rios.github.io/heimdall-api/docs/getting-started/ | Prerequisites, configuration, migrations, and running the API locally |
-| https://artur-rios.github.io/heimdall-api/docs/architecture/ | Four layers, CQRS mediator, auditing decorator, HTTP request pipeline |
-| https://artur-rios.github.io/heimdall-api/docs/domain-model/ | Entities, relationships, deletion cascade rules — class diagrams |
-| https://artur-rios.github.io/heimdall-api/docs/api-reference/ | Every endpoint, the role that may call it, and the use case it implements |
-| https://artur-rios.github.io/heimdall-api/docs/api-explorer/ | Swagger UI over the published OpenAPI document |
-| https://artur-rios.github.io/heimdall-api/docs/flows/ | Sequence diagrams for the paths worth tracing end to end |
-| https://artur-rios.github.io/heimdall-api/docs/flows/login/ | UC-11 — password authentication, uniform rejection, branch into 2FA challenge |
-| https://artur-rios.github.io/heimdall-api/docs/flows/two-factor/ | UC-36 to UC-40 — setup, confirmation, challenge-token round trip, recovery codes |
-| https://artur-rios.github.io/heimdall-api/docs/flows/google-sign-in/ | UC-24 to UC-29 — enabling per scope, sign-up/sign-in, administering Google Users |
-| https://artur-rios.github.io/heimdall-api/docs/flows/person-onboarding/ | UC-06, UC-14, UC-15 — creating a person, verification email, replacing a lost link |
-| https://artur-rios.github.io/heimdall-api/docs/flows/password-recovery/ | UC-12 and UC-13 — an endpoint designed around what it must not reveal |
-| https://artur-rios.github.io/heimdall-api/docs/flows/scope-permission-claims/ | UC-31 to UC-35 and FR-AU-08 — how a scope permission ends up inside a JWT |
-| https://artur-rios.github.io/heimdall-api/docs/flows/audit-logging/ | NFR-09 — one decorator, every write, no handler changes |
-| https://artur-rios.github.io/heimdall-api/docs/operations/ | Migrations, start-up guards, health checks, metrics, logging, rate limiting, data retention, integrations |
-| https://artur-rios.github.io/heimdall-api/docs/environments-and-deployment/ | The four environments and what each PostgreSQL has to allow (alias `/docs/deploying-with-docker/`) |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/ | The specification index (vision, SRD, use cases, tech stack, data protection, testing, workflow, operations) |
-| https://artur-rios.github.io/heimdall-api/docs/changelog/ | Notable changes in each release (renders root CHANGELOG.md) |
-| https://artur-rios.github.io/heimdall-api/docs/contributing/ | Build, tests and coverage, migrations, OpenAPI document, branching and releasing (renders CONTRIBUTING.md) |
-| https://artur-rios.github.io/heimdall-api/coverage-report/ | ReportGenerator coverage report (generated in CI, not committed) |
-| https://artur-rios.github.io/heimdall-api/openapi/heimdall.json | The OpenAPI document (raw JSON) |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/vision-document/ | Why Heimdall exists, who it serves, stakeholders, goals, success |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/system-requirements-document/ | FR/NFR, data model, endpoints, authorization matrix, deletion strategy |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/use-case-specification-document/ | Actor-facing use cases with main and numbered alternative flows |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/technology-stack-document/ | Technologies, libraries, pinned versions |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/data-protection-impact-assessment/ | Risks to data subjects and mitigations — GDPR Art. 35, LGPD Art. 38 |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/data-retention-schedule-document/ | How long each category of personal data is kept, why, which periods the API enforces |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/data-protection-document/ | Controllers, bases, recipients, transfers — LGPD Art. 37 / GDPR Art. 30 record |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/privacy-notice/ | What Heimdall does with personal data — LGPD Art. 9, GDPR Art. 13/14 |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/data-processing-agreement/ | Terms for processing a tenant's users' data — LGPD Art. 39, GDPR Art. 28 |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/incident-response-document/ | Personal data breach definition, declaration, clocks, notification |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/testing-specification-document/ | Unit and functional standards and required coverage per use case |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/threat-model-document/ | Threats by trust boundary and residual risk |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/development-workflow-document/ | Use case from backlog to merged: branch, issue status, testing gate, PR |
-| https://artur-rios.github.io/heimdall-api/docs/requirements/operations-infrastructure-document/ | Hosting, the four environments, technical foundation, health-check feature |
+| https://docs.artur-rios.tech/heimdall-api/ | Home: cover, feature blocks (multi-tenant by scope, authentication, identities, getting started, architecture & flows, spec, tests, traceability) |
+| https://docs.artur-rios.tech/heimdall-api/docs/ | Everything needed to understand, run, test, and extend the Heimdall API |
+| https://docs.artur-rios.tech/heimdall-api/docs/overview/ | Domain vocabulary — scopes, persons, roles, applications, permissions — and the rules that bind them |
+| https://docs.artur-rios.tech/heimdall-api/docs/getting-started/ | Prerequisites, configuration, migrations, and running the API locally |
+| https://docs.artur-rios.tech/heimdall-api/docs/architecture/ | Four layers, CQRS mediator, auditing decorator, HTTP request pipeline |
+| https://docs.artur-rios.tech/heimdall-api/docs/domain-model/ | Entities, relationships, deletion cascade rules — class diagrams |
+| https://docs.artur-rios.tech/heimdall-api/docs/api-reference/ | Every endpoint, the role that may call it, and the use case it implements |
+| https://docs.artur-rios.tech/heimdall-api/docs/api-explorer/ | Swagger UI over the published OpenAPI document |
+| https://docs.artur-rios.tech/heimdall-api/docs/flows/ | Sequence diagrams for the paths worth tracing end to end |
+| https://docs.artur-rios.tech/heimdall-api/docs/flows/login/ | UC-11 — password authentication, uniform rejection, branch into 2FA challenge |
+| https://docs.artur-rios.tech/heimdall-api/docs/flows/two-factor/ | UC-36 to UC-40 — setup, confirmation, challenge-token round trip, recovery codes |
+| https://docs.artur-rios.tech/heimdall-api/docs/flows/google-sign-in/ | UC-24 to UC-29 — enabling per scope, sign-up/sign-in, administering Google Users |
+| https://docs.artur-rios.tech/heimdall-api/docs/flows/person-onboarding/ | UC-06, UC-14, UC-15 — creating a person, verification email, replacing a lost link |
+| https://docs.artur-rios.tech/heimdall-api/docs/flows/password-recovery/ | UC-12 and UC-13 — an endpoint designed around what it must not reveal |
+| https://docs.artur-rios.tech/heimdall-api/docs/flows/scope-permission-claims/ | UC-31 to UC-35 and FR-AU-08 — how a scope permission ends up inside a JWT |
+| https://docs.artur-rios.tech/heimdall-api/docs/flows/audit-logging/ | NFR-09 — one decorator, every write, no handler changes |
+| https://docs.artur-rios.tech/heimdall-api/docs/operations/ | Migrations, start-up guards, health checks, metrics, logging, rate limiting, data retention, integrations |
+| https://docs.artur-rios.tech/heimdall-api/docs/environments-and-deployment/ | The four environments and what each PostgreSQL has to allow (alias `/docs/deploying-with-docker/`) |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/ | The specification index (vision, SRD, use cases, tech stack, data protection, testing, workflow, operations) |
+| https://docs.artur-rios.tech/heimdall-api/docs/changelog/ | Notable changes in each release (renders root CHANGELOG.md) |
+| https://docs.artur-rios.tech/heimdall-api/docs/contributing/ | Build, tests and coverage, migrations, OpenAPI document, branching and releasing (renders CONTRIBUTING.md) |
+| https://docs.artur-rios.tech/heimdall-api/coverage-report/ | ReportGenerator coverage report (generated in CI, not committed) |
+| https://docs.artur-rios.tech/heimdall-api/openapi/heimdall.json | The OpenAPI document (raw JSON) |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/vision-document/ | Why Heimdall exists, who it serves, stakeholders, goals, success |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/system-requirements-document/ | FR/NFR, data model, endpoints, authorization matrix, deletion strategy |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/use-case-specification-document/ | Actor-facing use cases with main and numbered alternative flows |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/technology-stack-document/ | Technologies, libraries, pinned versions |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/data-protection-impact-assessment/ | Risks to data subjects and mitigations — GDPR Art. 35, LGPD Art. 38 |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/data-retention-schedule-document/ | How long each category of personal data is kept, why, which periods the API enforces |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/data-protection-document/ | Controllers, bases, recipients, transfers — LGPD Art. 37 / GDPR Art. 30 record |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/privacy-notice/ | What Heimdall does with personal data — LGPD Art. 9, GDPR Art. 13/14 |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/data-processing-agreement/ | Terms for processing a tenant's users' data — LGPD Art. 39, GDPR Art. 28 |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/incident-response-document/ | Personal data breach definition, declaration, clocks, notification |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/testing-specification-document/ | Unit and functional standards and required coverage per use case |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/threat-model-document/ | Threats by trust boundary and residual risk |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/development-workflow-document/ | Use case from backlog to merged: branch, issue status, testing gate, PR |
+| https://docs.artur-rios.tech/heimdall-api/docs/requirements/operations-infrastructure-document/ | Hosting, the four environments, technical foundation, health-check feature |
 
 Useful anchors used by the API README itself: `/docs/operations/#environment-variables-at-a-glance`,
 `/docs/operations/#metrics--prometheus`, `/docs/operations/#rate-limiting`,

@@ -18,7 +18,7 @@ it and links to the API's documentation for the rest.
 
 Heimdall is two programs and a database, with a few services around them. Client
 systems are the systems that delegate their people and their sign-in to
-Heimdall. [Fortuna](https://artur-rios.github.io/fortuna-docs/) is one of them.
+Heimdall. [Fortuna](https://docs.artur-rios.tech/fortuna-docs/) is one of them.
 
 ```mermaid
 flowchart TB
@@ -80,9 +80,9 @@ flowchart TB
   on `http://localhost:8081` and the API on `http://localhost:8080`.
 
 The deployment details are in the API's
-[environments and deployment](https://artur-rios.github.io/heimdall-api/docs/environments-and-deployment/)
+[environments and deployment](https://docs.artur-rios.tech/heimdall-api/docs/environments-and-deployment/)
 page and its
-[operations](https://artur-rios.github.io/heimdall-api/docs/operations/) page.
+[operations](https://docs.artur-rios.tech/heimdall-api/docs/operations/) page.
 
 ## API layers
 
@@ -131,7 +131,7 @@ handler is wrapped by an auditing decorator that writes one audit log row per
 successful command. A failure to write that row is logged as a warning and
 never fails the request.
 
-The API's own [Architecture page](https://artur-rios.github.io/heimdall-api/docs/architecture/)
+The API's own [Architecture page](https://docs.artur-rios.tech/heimdall-api/docs/architecture/)
 goes further: the CQRS mediators, the auditing decorator and the HTTP request
 pipeline.
 

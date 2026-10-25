@@ -1,4 +1,4 @@
-baseURL = "https://artur-rios.github.io/heimdall-docs/"
+baseURL = "https://docs.artur-rios.tech/heimdall-docs/"
 title = "Heimdall"
 # `locale`, not the deprecated `languageCode` (renamed in Hugo v0.158.0).
 locale = "en-us"
@@ -87,7 +87,7 @@ disableKinds = ["taxonomy", "term"]
       desc = "This site"
     [[params.links.user]]
       name = "API documentation"
-      url = "https://artur-rios.github.io/heimdall-api/"
+      url = "https://docs.artur-rios.tech/heimdall-api/"
       icon = "fa-solid fa-book"
       desc = "The heimdall-api developer site"
 
@@ -95,7 +95,7 @@ disableKinds = ["taxonomy", "term"]
 [[menu.main]]
   name = "API site"
   weight = 30
-  url = "https://artur-rios.github.io/heimdall-api/"
+  url = "https://docs.artur-rios.tech/heimdall-api/"
   pre = "<i class='fa-solid fa-book'></i>"
 [[menu.main]]
   name = "GitHub"
