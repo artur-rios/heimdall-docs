@@ -49,8 +49,9 @@ hugo --minify
 
 ## Checking it
 
-The site image builds the site and then checks it, and a site that fails the
-check is not deployed. The check is that required pages exist, internal links
+Jenkins' `build` check builds the site image on every pull request, and the
+image builds the site and then checks it, so a site that fails the check fails
+the pull request and is never deployed. The check is that required pages exist, internal links
 and anchors resolve, Hugo printed no unexpected warnings, and no placeholder
 text is left. To run the same check locally:
 
@@ -87,6 +88,8 @@ heimdall-docs/
 │   ├── test_check_site.py    # tests for the checker
 │   └── required_pages.txt    # pages that must be built
 ├── LICENSE
+├── ci/build.sh               # the pull request check: builds the image
+├── yggdrasil.yml             # what Jenkins checks
 ├── Dockerfile                # builds, checks and serves the site
 ├── .dockerignore
 ├── renovate.json             # dependency updates
@@ -127,6 +130,10 @@ is served at <https://docs.artur-rios.tech/heimdall-docs/>. The image answers
 `/healthz` for the status check. The address comes from the build arguments
 `PUBLIC_HOST` and `PUBLIC_PATH`, which the deploy passes, so the `baseURL` in
 `hugo.toml` only matters for `hugo server`.
+
+Every pull request is checked by Jenkins' `build` check (`yggdrasil.yml`, run by
+`ci/build.sh`), which builds the same image without pushing or running it, and the site
+check above runs inside that build.
 
 To build the image locally:
 
