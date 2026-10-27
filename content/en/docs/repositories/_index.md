@@ -41,7 +41,7 @@ The documentation of each code repository is on its default branch,
 The API's specification is 14 documents in
 [`docs/requirements/`](https://github.com/artur-rios/heimdall-api/tree/develop/docs/requirements).
 All of them are also published on the
-[API site](https://artur-rios.github.io/heimdall-api/docs/requirements/), and the
+[API site](https://docs.artur-rios.tech/heimdall-api/docs/requirements/), and the
 [API documentation]({{< relref "/docs/api" >}}) page maps that site.
 
 ### Product and engineering documents

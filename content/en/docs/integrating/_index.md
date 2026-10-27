@@ -99,18 +99,18 @@ sequenceDiagram
   returns a short-lived challenge token instead of the access token. The challenge
   token is accepted only by `POST /api/auth/2fa/verify`, and it can be redeemed
   once. The details are in the API's
-  [two-factor flow](https://artur-rios.github.io/heimdall-api/docs/flows/two-factor/).
+  [two-factor flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/two-factor/).
 - **Google.** When a scope has switched Google Sign-In on, its people can sign
   in with Google through `POST /api/auth/google`. That makes them **Google
   users**, a separate kind of identity from persons: they always have the User
   role, belong to one scope and have no password. See the API's
-  [Google sign-in flow](https://artur-rios.github.io/heimdall-api/docs/flows/google-sign-in/).
+  [Google sign-in flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/google-sign-in/).
 - **Restricted identities.** An identity whose processing has been restricted can
   still sign in, but receives a subject-rights-only token that only a few
   endpoints accept. The answer says `processingRestricted: true`.
 
 The login sequence, step by step, is in the API's
-[login flow](https://artur-rios.github.io/heimdall-api/docs/flows/login/).
+[login flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/login/).
 
 ### The token and its claims
 
@@ -142,7 +142,7 @@ permission created, flagged or deleted afterwards does not change a token that i
 already out, and the holder picks the change up at the next sign-in. A User
 claims the flagged permissions of their scope, a Scope Admin claims those of every
 scope they own, and a System Admin claims none. The API's
-[scope permission claims](https://artur-rios.github.io/heimdall-api/docs/flows/scope-permission-claims/)
+[scope permission claims](https://docs.artur-rios.tech/heimdall-api/docs/flows/scope-permission-claims/)
 flow shows how a permission ends up in the token.
 
 ### Checking the token
@@ -159,7 +159,7 @@ restarts. After one token lifetime, the operator clears
 `HEIMDALL_AUTH_TOKEN_SECRET_PREVIOUS` and restarts again. A client system that
 validates tokens itself, as Fortuna does, has to be given the new secret too,
 or it will refuse the tokens Heimdall signs with it. The steps are in the API's
-[rotating the signing secret](https://artur-rios.github.io/heimdall-api/docs/operations/#rotating-the-signing-secret)
+[rotating the signing secret](https://docs.artur-rios.tech/heimdall-api/docs/operations/#rotating-the-signing-secret)
 section.
 How the shared secret fits into the deployment is described in the
 [Architecture]({{< relref "/docs/architecture" >}}) page, so it is not repeated
@@ -204,18 +204,18 @@ How it is set up and what to know about it:
   records the residual risk as TH-32.
 
 The caller key was added in API 1.4.0. The full description is in the API's
-[operations](https://artur-rios.github.io/heimdall-api/docs/operations/) page,
+[operations](https://docs.artur-rios.tech/heimdall-api/docs/operations/) page,
 under the heading "A client system calling for its users".
 
 ## Example: Fortuna
 
-[Fortuna](https://artur-rios.github.io/fortuna-docs/) is a personal-finance
+[Fortuna](https://docs.artur-rios.tech/fortuna-docs/) is a personal-finance
 system, and it is the client system the Heimdall documentation uses as its
 example. Its API, `fortuna-api`, keeps no users or passwords: it registers as a
 Heimdall scope and leaves identity, credentials, password recovery and
 two-factor authentication to Heimdall. The Fortuna site describes the whole
 system in its
-[architecture page](https://artur-rios.github.io/fortuna-docs/docs/architecture/).
+[architecture page](https://docs.artur-rios.tech/fortuna-docs/docs/architecture/).
 This section covers only the part that involves Heimdall.
 
 ```mermaid
@@ -276,12 +276,12 @@ The sources for this section are `fortuna-api`'s
 
 ## Where to go next
 
-- The API's [login flow](https://artur-rios.github.io/heimdall-api/docs/flows/login/),
-  [two-factor flow](https://artur-rios.github.io/heimdall-api/docs/flows/two-factor/),
-  [Google sign-in flow](https://artur-rios.github.io/heimdall-api/docs/flows/google-sign-in/),
-  [password recovery flow](https://artur-rios.github.io/heimdall-api/docs/flows/password-recovery/),
-  [person onboarding flow](https://artur-rios.github.io/heimdall-api/docs/flows/person-onboarding/)
-  and [scope permission claims](https://artur-rios.github.io/heimdall-api/docs/flows/scope-permission-claims/)
+- The API's [login flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/login/),
+  [two-factor flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/two-factor/),
+  [Google sign-in flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/google-sign-in/),
+  [password recovery flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/password-recovery/),
+  [person onboarding flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/person-onboarding/)
+  and [scope permission claims](https://docs.artur-rios.tech/heimdall-api/docs/flows/scope-permission-claims/)
   trace each path end to end.
 - The [API documentation]({{< relref "/docs/api" >}}) page maps every section of
   the API's site, including the endpoint reference.

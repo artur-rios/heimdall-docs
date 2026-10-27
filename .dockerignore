@@ -1,0 +1,14 @@
+# The build context of the site image (Dockerfile): the history, the workflows, the notes and the old build output stay
+# out, and so does node_modules (the image installs it).
+.git
+.github
+.gitignore
+.superpowers
+.wakatime-project
+.claude
+docs
+node_modules
+public
+resources
+hugo.log
+.hugo_build.lock

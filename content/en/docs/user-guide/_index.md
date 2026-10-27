@@ -112,9 +112,9 @@ copy has 58). For the other rows the UI has no screen that calls them.
 | Resend the second-factor email code | UC-46, Resend Second-Factor Email Code | `POST /api/auth/2fa/challenge/resend` |
 | Re-apply erasure after a database restore | `erasure-reconciliation` | `POST /api/auth/erasure-reconciliation` |
 
-Use the API's [API reference](https://artur-rios.github.io/heimdall-api/docs/api-reference/)
+Use the API's [API reference](https://docs.artur-rios.tech/heimdall-api/docs/api-reference/)
 for who may call each one and what it expects, or the
-[API Explorer](https://artur-rios.github.io/heimdall-api/docs/api-explorer/) to
+[API Explorer](https://docs.artur-rios.tech/heimdall-api/docs/api-explorer/) to
 read their request and response shapes (it does not send requests). Note that the restricted-session screen can lift a restriction
 (UC-45), download your data (UC-41) and request erasure (UC-42), but cannot
 impose a restriction in the first place; that is UC-44, above.

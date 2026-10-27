@@ -7,7 +7,7 @@ from pathlib import Path
 
 import check_site
 
-BASE = "https://artur-rios.github.io/demo-docs/"
+BASE = "https://docs.artur-rios.tech/demo-docs/"
 
 
 def write(root: Path, rel: str, body: str) -> None:
@@ -62,7 +62,7 @@ class CheckPagesTests(unittest.TestCase):
         self.assertEqual(len(errors), 1)
 
     def test_other_site_on_same_host_is_external(self):
-        write(self.public, "index.html", '<a href="https://artur-rios.github.io/heimdall-api/docs/">x</a>')
+        write(self.public, "index.html", '<a href="https://docs.artur-rios.tech/heimdall-api/docs/">x</a>')
         self.assertEqual(check_site.check_pages(self.public, BASE, []), [])
 
     def test_missing_public_fails(self):

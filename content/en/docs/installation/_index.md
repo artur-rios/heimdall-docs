@@ -116,9 +116,9 @@ cover:
   `API_IMAGE_TAG`, `HEIMDALL_RUN_MIGRATIONS` and `COMPOSE_PROJECT_NAME`.
 
 The defaults and the meaning of every setting are in the API's
-[Getting started](https://artur-rios.github.io/heimdall-api/docs/getting-started/)
+[Getting started](https://docs.artur-rios.tech/heimdall-api/docs/getting-started/)
 page and in its
-[environment variables at a glance](https://artur-rios.github.io/heimdall-api/docs/operations/#environment-variables-at-a-glance)
+[environment variables at a glance](https://docs.artur-rios.tech/heimdall-api/docs/operations/#environment-variables-at-a-glance)
 table.
 
 {{% alert title="CORS blocks a browser UI by default" color="warning" %}}
@@ -200,7 +200,7 @@ curl http://localhost:5177/healthcheck
 
 The first calls on an empty database are, in order, login, create an
 administrator, create a scope, and create a User in a scope. The API's
-[Getting started](https://artur-rios.github.io/heimdall-api/docs/getting-started/)
+[Getting started](https://docs.artur-rios.tech/heimdall-api/docs/getting-started/)
 page walks through them.
 
 ### Option B: Docker Compose
@@ -248,7 +248,7 @@ the same name makes the second run look for its migration history in that
 schema and fail with `relation "role" already exists`. Compose pins
 `Search Path=public` to avoid it, and the same trap applies when you run from
 source. The API's
-[Environments and deployment](https://artur-rios.github.io/heimdall-api/docs/environments-and-deployment/)
+[Environments and deployment](https://docs.artur-rios.tech/heimdall-api/docs/environments-and-deployment/)
 page walks through creating the database and login and what each host's
 PostgreSQL has to allow.
 {{% /alert %}}
@@ -452,5 +452,5 @@ Ubuntu VPS and are deployed by Jenkins, with the API running as
 homologation are on demand and run only while somebody uses them. No public host
 names are given here, because the repositories use `example.com` as a stand-in
 for the real domain. The API's
-[Environments and deployment](https://artur-rios.github.io/heimdall-api/docs/environments-and-deployment/)
+[Environments and deployment](https://docs.artur-rios.tech/heimdall-api/docs/environments-and-deployment/)
 page has the full table, and the walkthroughs for each host.
