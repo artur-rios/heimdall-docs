@@ -1,11 +1,5 @@
 # heimdall-docs
 
-> [!NOTE]
-> This is the real, open-source code of heimdall-docs. Its home is Forgejo, at
-> https://git.techcraftsmen.net/artur-rios/heimdall-docs; the copy on GitHub is a read-only mirror, for viewing only, and
-> its issues and pull requests are not followed. If you want to contribute, email me at
-> arturdev@duck.com.
-
 The home page and documentation portal for
 [Heimdall](https://github.com/artur-rios/heimdall-api), a centralized identity
 management system with scope-based multi-tenancy: an ASP.NET Core API and the
@@ -14,9 +8,6 @@ is put together, how to run it, and how to use it. The API's internals live on
 the [heimdall-api site](https://docs.artur-rios.tech/heimdall-api/).
 
 **[docs.artur-rios.tech/heimdall-docs](https://docs.artur-rios.tech/heimdall-docs/)**
-
-The repository lives at <https://git.techcraftsmen.net/artur-rios/heimdall-docs>; the copy on GitHub is a
-read-only mirror.
 
 This repository contains documentation only. It builds no software and ships no
 package.
@@ -150,3 +141,8 @@ docker run --rm -p 8080:8080 heimdall-docs
 ```
 
 The site is then at <http://localhost:8080/heimdall-docs/>.
+
+## Contributing
+
+The GitHub repository is a read-only mirror for the real, open-source code of heimdall-docs. Its home is Forgejo, at
+https://git.techcraftsmen.net/artur-rios/heimdall-docs. If you want to contribute, e-mail me at arturdev@duck.com.
