@@ -5,8 +5,8 @@ weight: 90
 description: 'The specification: vision, system requirements, use cases, technology stack, data protection, testing, workflow, and operations.'
 ---
 
-These fourteen documents are the **specification** for Heimdall. Everything else on this site describes
-what was built; these say what must be true.
+These fourteen documents are the **specification** for the Heimdall API. The rest of the API
+documentation describes what was built; these say what must be true.
 
 They are also the working documents of the project, not a retrospective write-up: a feature is
 implemented by picking a use case, following its main and alternative flows, and citing the

@@ -243,4 +243,4 @@ its owner out of signing in.
 | Recovery codes | SHA-256 only — 80 random bits need no per-code salt or slow hash (FR-2F-20) | Once, when generated |
 | Email codes | Hash **+ per-code salt** — only 10⁶ possible values | Never; mailed |
 
-That is **NFR-16**. See [Domain model](../../../architecture/).
+That is **NFR-16**. See [Domain model](../../../architecture/domain-model/#secrets-at-rest).

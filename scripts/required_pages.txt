@@ -4,7 +4,9 @@ docs/
 docs/overview/
 about/
 docs/architecture/
+docs/architecture/domain-model/
 docs/installation/
+docs/installation/environments-and-deployment/
 docs/user-guide/
 docs/user-guide/signing-in/
 docs/user-guide/password-and-email/

@@ -8,7 +8,7 @@ description: 'Every endpoint, the role that may call it, and the use case it imp
 Schema-level documentation — every parameter, every request and response body — is published as an
 OpenAPI document and rendered by the [API explorer](../explorer/), which is the same document a
 running instance serves through its own Swagger UI at `/swagger`. To *call* the endpoints, use that,
-or the [`.http` files or Bruno collection](../../installation/) in `api-client/`.
+or the [`.http` files or Bruno collection](../../installation/#calling-the-api) in `api-client/`.
 
 This page is the map — what exists, who may call it, and which use case it implements.
 

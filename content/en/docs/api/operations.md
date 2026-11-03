@@ -262,7 +262,7 @@ FROM pg_roles r WHERE r.rolname = 'heimdall_svc';
 
 2. Set both passwords, which the env file will hold: `sudo -u postgres psql -c '\password
    heimdall_owner'`, and the same for `heimdall_svc`. Give both a `pg_hba.conf` rule like the one in
-   the [deployment guide](../../installation/) (`heimdall_owner` only needs it while the
+   the [deployment guide](../../installation/environments-and-deployment/) (`heimdall_owner` only needs it while the
    container migrates; a deployment that migrates out of band gives it a local rule instead).
 3. In the env file, set `DB_USER`/`DB_PASSWORD` to the runtime login and
    `HEIMDALL_MIGRATIONS_CONNECTIONSTRING` to the owner's whole connection string, with the same
