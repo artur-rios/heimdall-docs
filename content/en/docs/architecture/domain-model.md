@@ -329,7 +329,10 @@ third rule above could not otherwise be enforced. The scope lives in `SCOPE_USER
 `READ COMMITTED` two concurrent inserts see the same pre-write snapshot and both find the address
 free. Only a unique index serialises them, and an index needs its columns on one table.
 
-`SCOPE_USER` remains the relationship (§4.6) and every read goes through it. The copy is written by
+`SCOPE_USER` remains the relationship (§4.6). A read that only needs to know which scope a person is
+in may take the copy directly: the email verification and password-reset services do, to find the
+scope's link bases, because the copy mirrors the membership at every place that writes either. The
+copy is written by
 the three handlers that write the membership — UC-06 path a sets both, UC-23 and UC-08's role change
 clear both — and the index's condition matches `CreateUserCommandHandler`'s check term for term, so
 the rule itself did not change. Only who enforces it under concurrency did.

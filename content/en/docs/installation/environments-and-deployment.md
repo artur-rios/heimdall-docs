@@ -39,8 +39,8 @@ What the ASP.NET environment changes:
 
 **Local** is deployed by hand on Docker Desktop. **Development, homologation and production** share
 one Ubuntu VPS and are deployed by [yggdrasil](https://github.com/artur-rios/yggdrasil), whose Jenkins
-runs this repository's
-[`Jenkinsfile`](https://github.com/artur-rios/heimdall-api/blob/main/Jenkinsfile). Development and
+reads this repository's pipeline file,
+[`yggdrasil.yml`](https://github.com/artur-rios/heimdall-api/blob/main/yggdrasil.yml). Development and
 homologation are started only while somebody uses them.
 
 ## What is being deployed

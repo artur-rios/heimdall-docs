@@ -19,20 +19,21 @@ site keeps. The pull request body quotes this file.
 
 | # | One page said | Another page said | The code says | Kept |
 | --- | --- | --- | --- | --- |
-| 5 | Overview: `Person` has no `ScopeId`; a person has no scope column. | Domain model: `PERSON.scope_id` is a copy of a User's `SCOPE_USER` scope, kept so a unique index can enforce per-scope email uniqueness. | `Entities/Person.cs` has `long? ScopeId`, a copy of the membership's scope for a User and `null` for administrators; the relationship itself is still `SCOPE_USER` / `SCOPE_OWNER`. | The domain model. The overview now says the relationship lives in the join tables and the person row carries one copy of a User's scope for the index. |
+| 5 | Overview: `Person` has no `ScopeId`; a person has no scope column. Domain model: `SCOPE_USER` remains the relationship "and every read goes through it". | Domain model: `PERSON.scope_id` is a copy of a User's `SCOPE_USER` scope, kept so a unique index can enforce per-scope email uniqueness. | `Entities/Person.cs:195-201` has `long? ScopeId`, a copy of the membership's scope for a User and `null` for administrators; `SCOPE_USER` remains the relationship, but a read that only needs the scope may take the column directly, and `EmailVerificationService.cs:50`, `PasswordResetService.cs:56` and `PersonEmailAuthorization.cs:29` do. | The code. The overview says the relationship lives in the join tables, the person row carries a copy of a User's scope for the index, and scope-only reads may use it; the domain model's "every read goes through it" is corrected the same way. |
 | 6 | Overview: authentication reads no database per request, so a token can outlive the account it names until it expires. | Architecture: `ActorLivenessFilter` refuses a token whose person or Google User is absent or logically deleted, at one indexed read per request. | `Security/ActorLivenessFilter.cs` exists and is registered globally. | The architecture page. The overview says validation reads no database, but the named identity is checked on every authenticated request. |
 
-### heimdall-docs against the code (no API-site statement)
+### Against the code (no second statement)
 
-These were stale facts on pages this task merged; the code corrected them.
+These were stale facts on pages this task merged or moved; the code corrected them.
 
-| # | heimdall-docs said | The code says | Now |
+| # | The page said | The code says | Now |
 | --- | --- | --- | --- |
 | 7 | The pinned EF Core CLI is `dotnet-ef` 10.0.12. | `.config/dotnet-tools.json`: 10.0.13. | 10.0.13. |
 | 8 | Clone with `--recurse-submodules`, because the documentation site's theme is a git submodule. | No `.gitmodules` at `82f7d353`. | A plain `git clone`. |
 | 9 | The `docker` job in the `tests.yml` workflow checks that the API image builds. | No `.github/workflows` at `82f7d353`; `yggdrasil.yml` runs the `docker` check, `ci/docker.sh`, on Jenkins. | The Jenkins `docker` check. |
 | 10 | The latest releases are API v1.4.0 and UI v1.6.1. | heimdall-api `CHANGELOG.md`: 4.2.0; heimdall-ui `CHANGELOG.md`: 1.10.0. | v4.2.0 and v1.10.0. |
 | 11 | Every line of the tracked `Environments/.env` template holds a `[[...]]` placeholder. | `HEIMDALL_AUTH_SIGNING_KEY=` is empty in the template. | "Most lines", with the signing key named as the exception. |
+| 12 | Environments and deployment (API site, moved here): yggdrasil's Jenkins runs this repository's `Jenkinsfile`. | No `Jenkinsfile` at `82f7d353` (commit `a82525ff` removed it); `yggdrasil.yml` is the pipeline file Jenkins reads. | The sentence names and links `yggdrasil.yml`. |
 
 Not a contradiction, only a difference in precision: the heimdall-api README says `HEIMDALL_APPLICATION_TOKEN_AUDIENCE`
 must differ from `HEIMDALL_AUTH_TOKEN_AUDIENCE`; the API site adds the two audiences derived from it, and

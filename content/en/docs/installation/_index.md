@@ -360,12 +360,13 @@ reports the container healthy once `/healthcheck` answers. The local environment
 runs the API as `Development`, so Swagger UI is at
 `http://localhost:8080/swagger`.
 
-Besides the API's own settings, the env file holds the ones only Compose reads:
-`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SEARCH_PATH` and
-`DB_CONNECTION_EXTRA`, from which Compose assembles the connection string;
-`API_PORT`, `API_IMAGE` and `API_IMAGE_TAG`; `HEIMDALL_RUN_MIGRATIONS` and
-`HEIMDALL_MIGRATIONS_CONNECTIONSTRING`, which only the container's entrypoint
-reads; and `COMPOSE_PROJECT_NAME`.
+Besides the API's own settings, the env file holds ones the API itself never
+reads: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`,
+`DB_SEARCH_PATH` and `DB_CONNECTION_EXTRA`, from which Compose assembles the
+connection string; `API_PORT`, `API_IMAGE` and `API_IMAGE_TAG`;
+`HEIMDALL_RUN_MIGRATIONS`, read by the container's entrypoint only;
+`HEIMDALL_MIGRATIONS_CONNECTIONSTRING`, read by the entrypoint and by
+`scripts/migrations.py`; and `COMPOSE_PROJECT_NAME`.
 
 Pass the env file to every Compose command, not only `up`, because it supplies
 the project name:

@@ -140,9 +140,11 @@ flowchart TD
 administrator may own several scopes. An administrator with a `SCOPE_USER` row,
 or a User with two, is not representable, because the join tables carry the
 constraints: `SCOPE_USER.PersonId` is unique, and `SCOPE_OWNER` has a composite
-key. The person row carries one copy of a User's scope, `scope_id`, and only so
-that a database index can keep a User's email unique within their scope; every
-read of the relationship still goes through `SCOPE_USER`. The
+key. The person row also carries a copy of a User's scope, `scope_id`, which
+exists so that a database index can keep a User's email unique within their
+scope. `SCOPE_USER` remains the relationship; a read that only needs to know
+which scope a User is in, such as finding the scope's email links, may take the
+copy directly. The
 [domain model]({{< relref "/docs/architecture/domain-model#the-scope-a-user-belongs-to-twice" >}})
 explains why.
 
