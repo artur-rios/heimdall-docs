@@ -65,7 +65,5 @@
     {{- end -}}
     {{- $external = true -}}
   {{- end -}}
-{{- else if not (hasPrefix $dest (printf "%s" site.BaseURL)) -}}
-  {{- $external = true -}}
 {{- end -}}
 <a href="{{ $dest | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}{{ if $external }} target="_blank" rel="noopener"{{ end }}>{{ .Text | safeHTML }}</a>
