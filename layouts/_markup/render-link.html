@@ -10,22 +10,24 @@
        permalink in this section.
     2. A source-file link — "../src/...", "../tests/...", "../lib/...", or a link up to a file in
        the repository root such as "../../CONTRIBUTING.md" — has no page on this site at all, so it
-       becomes a GitHub blob URL in the repository the page documents: a page under docs/api/ maps
-       to heimdall-api, a page under docs/application/ to heimdall-ui.
+       becomes a GitHub blob URL in the repository the document belongs to: a document under
+       docs/api/requirements/documents/ maps to heimdall-api, one under
+       docs/application/requirements/documents/ to heimdall-ui.
 
-  Everything else (absolute URLs, in-page anchors, and the relative links written by this site's
-  own pages) is passed through untouched.
+  Only those copied documents are translated. Every other page — absolute URLs, in-page anchors,
+  and the relative links written by this site's own hand-written pages, "../../user-guide/"
+  included — is passed through untouched.
 */ -}}
 {{- $dest := .Destination -}}
 {{- $u := urls.Parse $dest -}}
 {{- $external := false -}}
 
-{{- /* The repository a page's source links point into, chosen by where the page lives. */ -}}
+{{- /* The repository a copied document's source links point into; empty for every other page. */ -}}
 {{- $repo := "" -}}
 {{- $pagePath := .Page.Path -}}
-{{- if hasPrefix $pagePath "/docs/api/" -}}
+{{- if hasPrefix $pagePath "/docs/api/requirements/documents/" -}}
   {{- $repo = "https://github.com/artur-rios/heimdall-api" -}}
-{{- else if hasPrefix $pagePath "/docs/application/" -}}
+{{- else if hasPrefix $pagePath "/docs/application/requirements/documents/" -}}
   {{- $repo = "https://github.com/artur-rios/heimdall-ui" -}}
 {{- end -}}
 {{- $branch := "main" -}}
