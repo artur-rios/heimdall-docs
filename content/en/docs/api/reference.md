@@ -2,7 +2,7 @@
 title: 'API reference'
 linkTitle: 'API reference'
 weight: 60
-description: 'Every endpoint, the role that may call it, and the use case it implements.'
+description: 'The endpoints it covers, the role that may call each, and the use case each implements.'
 ---
 
 Schema-level documentation — every parameter, every request and response body — is published as an
@@ -11,6 +11,15 @@ running instance serves through its own Swagger UI at `/swagger`. To *call* the 
 or the [`.http` files or Bruno collection](../../installation/#calling-the-api) in `api-client/`.
 
 This page is the map — what exists, who may call it, and which use case it implements.
+
+{{% alert title="Not every operation is listed here" color="warning" %}}
+The OpenAPI document has 79 operations and this page does not cover six of them:
+`POST /api/auth/register`, `POST /api/auth/2fa/challenge/resend`,
+`POST /api/auth/erasure-reconciliation`, `PUT /api/scopes/{id}/self-registration`,
+`PUT /api/scopes/{id}/email-links` and `GET /api/healthcheck/ready`. Find their request and response
+shapes in the [API explorer](../explorer/), which is complete; where the two disagree, the OpenAPI
+document is right.
+{{% /alert %}}
 
 ## Reading the "Who" column
 

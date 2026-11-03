@@ -120,8 +120,8 @@ read their request and response shapes (it does not send requests). Note that th
 impose a restriction in the first place; that is UC-44, above.
 
 The source of this guide is the UI's
-[Use Case Specification Document](https://github.com/artur-rios/heimdall-ui/blob/develop/docs/requirements/Use%20Case%20Specification%20Document.md)
+[Use Case Specification Document]({{< relref "/docs/application/requirements/documents/use-case-specification-document" >}})
 and its
-[System Requirements Document](https://github.com/artur-rios/heimdall-ui/blob/develop/docs/requirements/System%20Requirements%20Document.md).
+[System Requirements Document]({{< relref "/docs/application/requirements/documents/system-requirements-document" >}}).
 Where the screens differ from the specification, this guide describes the
 screens.

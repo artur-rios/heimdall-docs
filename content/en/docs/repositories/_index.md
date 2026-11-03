@@ -55,7 +55,8 @@ bundle, the Linux and Windows builds and the Android APK. How to get either is i
 
 The documentation of each code repository is on its default branch, `develop`,
 and the same documents also exist on `main`. The links to the repository folders
-below use `main`, the branch a release is cut to.
+below use `main`, which receives each release: a release is cut from `develop` as
+`release/x.y.z` and merged into `main`.
 
 ## The specification on this site
 
@@ -130,10 +131,11 @@ off. The milestones are:
 | heimdall-api | MVP, Google Sign-In, and LGPD & GDPR Compliance |
 | heimdall-ui | Platform & Infrastructure, Authentication & Session, Profile & Security, Scope Management, Person Management, Application Management, Scope Permission Management, and Google Users |
 
-The READMEs of the repositories carry their own status tables, and this site
-tracks [API use case status]({{< relref "/docs/api/use-case-status" >}}) and
-[application use case status]({{< relref "/docs/application/use-case-status" >}}).
-It does not repeat progress counts that would go stale.
+The READMEs of the repositories carry their own status tables. This site does
+not track use case status: the pages
+[API use case status]({{< relref "/docs/api/use-case-status" >}}) and
+[application use case status]({{< relref "/docs/application/use-case-status" >}})
+say where to find it. It does not repeat progress counts that would go stale.
 
 Each issue moves from Todo through In Progress and Testing to Done,
 and each use case ships on its own branch, issue and pull request, as the Development

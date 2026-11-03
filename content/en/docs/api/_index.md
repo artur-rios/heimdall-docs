@@ -1,6 +1,6 @@
 ---
 title: API documentation
-linkTitle: API documentation
+linkTitle: API
 weight: 60
 description: >
   The Heimdall API in detail: the endpoints and their OpenAPI document, the flows worth tracing, operating the API, test coverage and the specification.
@@ -20,7 +20,7 @@ To run the API, see [Installation]({{< relref "/docs/installation" >}}).
 
 | Page | What it covers |
 | --- | --- |
-| [API reference](reference/) | Every endpoint, the role that may call it, and the use case it implements. |
+| [API reference](reference/) | The endpoints it covers, the role that may call each, and the use case each implements. A few operations are only in the OpenAPI document. |
 | [API explorer](explorer/) | Swagger UI over the published OpenAPI document. It is read-only: it shows each operation's request and response shapes but does not send requests. |
 | [OpenAPI document](../../api/openapi/heimdall.json) | The OpenAPI document itself, as raw JSON. |
 

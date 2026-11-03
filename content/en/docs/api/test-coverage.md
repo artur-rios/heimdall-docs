@@ -9,7 +9,7 @@ The [coverage report](../../../api/coverage-report/) shows which lines and branc
 API the unit and functional test suites execute, per assembly, class and file. It is a
 ReportGenerator HTML report.
 
-The report is not committed. CI regenerates it from the API's test run on every release and
+The report is not committed to heimdall-api. CI regenerates it from the API's test run on every release and
 publishes it with this site, so it always describes the latest released version of the API rather
 than a branch in progress. The coverage the API is held to, use case by use case, is set out in the
 [Testing Specification Document](../requirements/documents/testing-specification-document/); how to

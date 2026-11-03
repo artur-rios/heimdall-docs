@@ -526,7 +526,7 @@ runs `dart run tool/generate_api_client.dart` and then
 
 The commands for refreshing the snapshot from a local API checkout are in the
 UI's
-[CONTRIBUTING.md](https://github.com/artur-rios/heimdall-ui/blob/develop/CONTRIBUTING.md#generated-api-client).
+[CONTRIBUTING.md](https://github.com/artur-rios/heimdall-ui/blob/main/CONTRIBUTING.md#generated-api-client).
 
 ### Configuration and secure storage
 
@@ -587,7 +587,7 @@ flowchart TD
 Every signed-in role, except a restricted session, also gets the home screen,
 its own profile and the two-factor settings. The full table of which role reaches which screen is in the
 UI's
-[System Requirements Document](https://github.com/artur-rios/heimdall-ui/blob/develop/docs/requirements/System%20Requirements%20Document.md).
+[System Requirements Document]({{< relref "/docs/application/requirements/documents/system-requirements-document" >}}).
 
 {{% alert title="The API is the only authority" color="primary" %}}
 Showing or hiding a screen is a usability decision, never a security control.

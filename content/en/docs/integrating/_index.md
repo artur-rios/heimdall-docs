@@ -117,7 +117,8 @@ The login sequence, step by step, is in the API's
 
 The token is a stateless signed JWT. Heimdall keeps no revocation list, so a
 token is good until it expires. The one exception is on Heimdall's own side:
-its API refuses a token whose identity has since been deleted or restricted, and
+its API refuses a token whose identity has since been deleted or restricted, a
+token whose role claim no longer matches the identity's role, and
 a person token whose security stamp has changed since it was issued (after a
 password reset, an email change, or two-factor authentication being confirmed or
 disabled or its recovery codes regenerated). A client system that validates
@@ -161,9 +162,11 @@ a `kid` that names the key it was signed with. The retired shared secret
 (`HEIMDALL_AUTH_TOKEN_SECRET`) is no longer read, and since API 4.0.0 every
 reader refuses an HS256 token.
 
-- **Verify against the key set.** Fetch it from `https://<PUBLIC_HOST>/.well-known/jwks.json`
-  (inside the platform, from the internal edge URL
-  `http://heimdall-api.<environment>:8080/.well-known/jwks.json`), accept ES256
+- **Verify against the key set.** Fetch it from the API's own host,
+  `https://heimdall-api.<domain>/.well-known/jwks.json` (the host the API is
+  published on, `PUBLIC_HOST`; the UI host does not serve it). Inside the
+  platform, use the internal edge URL
+  `http://heimdall-api.<environment>:8080/.well-known/jwks.json`. Accept ES256
   only, and resolve the key by `kid`.
 - **Refetch on an unknown `kid`**, at most once a minute, and replace the cached
   set with the one fetched. That is how a consumer learns of a rotated key
@@ -221,7 +224,7 @@ How it is set up and what to know about it:
   system to the new key, then remove the old one and restart again.
 - **A leaked key** lets its holder pick a bucket, which only spreads credential
   guesses over invented addresses. The per-account lockouts still count them. The
-  API's [Threat Model Document](https://github.com/artur-rios/heimdall-api/blob/develop/docs/requirements/Threat%20Model%20Document.md)
+  API's [Threat Model Document]({{< relref "/docs/api/requirements/documents/threat-model-document" >}})
   records the residual risk as TH-32.
 
 The caller key was added in API 1.4.0. The full description is in the API's
