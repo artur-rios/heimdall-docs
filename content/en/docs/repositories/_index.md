@@ -9,7 +9,7 @@ description: >
 Heimdall lives in two code repositories, the API and the UI, and this
 documentation site has a repository of its own. Both code repositories keep
 their specification documents in `docs/requirements/`, and both track their work
-on GitHub project boards and milestones.
+as issues and milestones on Forgejo.
 
 ## Where the code lives
 
@@ -117,19 +117,23 @@ the [User guide]({{< relref "/docs/user-guide" >}}) draws on these documents.
 | [Testing Specification Document](../application/requirements/documents/testing-specification-document/) | How each use case is tested: the levels, the naming convention, the structure, and what coverage means here. |
 | [Development Workflow Document](../application/requirements/documents/development-workflow-document/) | How a use case goes from backlog to merged: branch, issue status, testing gate and pull request. |
 
-## Project boards and milestones
+## Issues and milestones
 
-Work on both repositories is tracked on public GitHub project boards, which are
-the live view of what is done and what is in progress.
+Work on both repositories is tracked as issues and milestones on Forgejo, at
+`git.techcraftsmen.net/artur-rios/<repository>`; the pages need a sign-in, so this
+site does not link them. The issues, labels, milestones, releases and pull requests
+were migrated there from GitHub, and the GitHub repositories have issues turned
+off. The milestones are:
 
-| Repository | Project board | Milestones |
-| --- | --- | --- |
-| heimdall-api | [Project board](https://github.com/users/artur-rios/projects/7) | [Milestones](https://github.com/artur-rios/heimdall-api/milestones): MVP, Google Sign-In, and LGPD & GDPR Compliance |
-| heimdall-ui | [Heimdall UI Delivery](https://github.com/users/artur-rios/projects/11) | [Milestones](https://github.com/artur-rios/heimdall-ui/milestones): Platform & Infrastructure, Authentication & Session, Profile & Security, Scope Management, Person Management, Application Management, Scope Permission Management, and Google Users |
+| Repository | Milestones |
+| --- | --- |
+| heimdall-api | MVP, Google Sign-In, and LGPD & GDPR Compliance |
+| heimdall-ui | Platform & Infrastructure, Authentication & Session, Profile & Security, Scope Management, Person Management, Application Management, Scope Permission Management, and Google Users |
 
-The board and the milestone pages show the current state. The READMEs of the
-repositories carry their own status tables, but GitHub is the source of truth, so
-this site does not repeat progress counts that would go stale.
+The READMEs of the repositories carry their own status tables, and this site
+tracks [API use case status]({{< relref "/docs/api/use-case-status" >}}) and
+[application use case status]({{< relref "/docs/application/use-case-status" >}}).
+It does not repeat progress counts that would go stale.
 
 Each issue moves from Todo through In Progress and Testing to Done,
 and each use case ships on its own branch, issue and pull request, as the Development
