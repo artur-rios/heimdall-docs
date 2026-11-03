@@ -18,47 +18,52 @@ data retention settings, this page links to the
 
 ## Getting a release
 
-Read this section before looking for a download, because **nothing is attached
-to a GitHub release**. At the time of writing the latest releases are API
-**v4.2.0** and UI **v1.10.0**. Every release of both repositories carries a tag
-and generated notes, and no files. Where a runnable thing does come from is
-listed below.
+Read this section before looking for a download. At the time of writing the
+latest releases are API **v4.2.0** and UI **v1.10.0**. Every release of both
+repositories carries a tag and generated notes. **An API release has no files
+attached.** A UI release has the files listed below. Where a runnable thing
+comes from is listed here.
 
 | What | Where it comes from |
 | --- | --- |
 | API source | Clone [heimdall-api](https://github.com/artur-rios/heimdall-api) and run it as described in [Running the API](#running-the-api). |
 | API container image | Built from the repository's `Dockerfile`. Locally you build it yourself with `docker compose` (see [Docker Compose](#option-b-docker-compose)). On the VPS environments, Jenkins builds it per environment. No image is pushed to a registry. The `docker` check Jenkins runs on the repository (`ci/docker.sh`) only checks that the image can be built. |
 | UI source | Clone [heimdall-ui](https://github.com/artur-rios/heimdall-ui) and run it as described in [Running the UI](#running-the-ui). |
-| UI builds (web, Windows, Linux, Android) | Workflow artifacts of the [Build workflow](https://github.com/artur-rios/heimdall-ui/actions/workflows/build.yml), described below. |
+| UI builds (web, Windows, Linux, Android) | Files attached to a heimdall-ui GitHub release, described in [UI release files](#ui-release-files). |
 | UI web container image | Built from the repository's `Dockerfile`. On the VPS environments, Jenkins builds one image per environment. |
 
-### UI builds from CI
+### UI release files
 
-The `build.yml` workflow runs on every push to `main` and can also be started by
-hand (`workflow_dispatch`). It builds each target and uploads the result as a
-workflow artifact:
+A heimdall-ui release carries one file per platform, named with the version (the
+tag without its `v`). Two pipelines build them from the release's tag. Jenkins
+builds the web, Linux and Android files with `ci/release-build.sh`, as the
+`release.build` step of the repository's pipeline file,
+[`yggdrasil.yml`](https://github.com/artur-rios/heimdall-ui/blob/main/yggdrasil.yml).
+For the Windows file, Jenkins dispatches the `Release Windows` workflow
+(`release-windows.yml`) on GitHub Actions against the same tag, waits for it,
+and attaches its zip to the release.
 
-| Artifact name | Contents |
-| --- | --- |
-| `heimdall-ui-web` | `build/web` |
-| `heimdall-ui-linux` | `build/linux/x64/release/bundle` |
-| `heimdall-ui-windows` | `build/windows/x64/runner/Release` |
-| `heimdall-ui-android` | the APK from `build/app/outputs/flutter-apk` |
+| File | Contents | Built by |
+| --- | --- | --- |
+| `heimdall-ui-web-<version>.zip` | `build/web` | Jenkins |
+| `heimdall-ui-linux-x64-<version>.tar.gz` | `build/linux/x64/release/bundle` | Jenkins |
+| `heimdall-ui-android-<version>.apk` | the APK from `build/app/outputs/flutter-apk` | Jenkins |
+| `heimdall-ui-windows-x64-<version>.zip` | `build/windows/x64/runner/Release` | GitHub Actions |
 
 Three things to know before you use one:
 
-- **They are workflow artifacts, not release files.** GitHub keeps
-  workflow artifacts only for its own retention period, and downloading them
-  needs a GitHub sign-in, so there is no permanent download link.
-- **They point at `http://localhost:8080`.** The workflow supplies no API base
+- **They point at `http://localhost:8080`.** The pipelines supply no API base
   URL, on purpose, so that no deployment address appears in a public build log.
   The UI's configuration is fixed when it is built (see
-  [Running the UI](#running-the-ui)), so these artifacts are only useful against
-  an API that listens on the default address. For any other API, build the UI
+  [Running the UI](#running-the-ui)), so these files are only useful against an
+  API that listens on the default address. For any other API, build the UI
   yourself.
-- **The Android APK is signed with the debug key.** The workflow says it is
-  suitable for testing, never for release. The Windows and Linux builds are
-  unsigned, and no target updates itself.
+- **The Android APK is signed with the release key.** A release without the
+  keystore fails instead of publishing a debug-signed file. How the signing is
+  configured is under
+  [Signing the Android release]({{< relref "/docs/application#signing-the-android-release" >}}).
+- **The Windows and Linux files are unsigned.** Nothing in the pipelines signs
+  or packages them.
 
 ## Running the API
 
@@ -579,9 +584,10 @@ from a file at runtime. There are three keys:
 | `HEIMDALL_GOOGLE_CLIENT_ID` | Only for Google Sign-In | unset, and the Google control is hidden |
 | `HEIMDALL_SCOPE_ID` | Only when no calling application supplies a scope | unset |
 
-What each key does, and how a calling web application names the scope with
-`sessionStorage`, is explained under
-[Configuration and secure storage]({{< relref "/docs/architecture#configuration-and-secure-storage" >}}).
+What each key does is explained under
+[Configuration and secure storage]({{< relref "/docs/architecture#configuration-and-secure-storage" >}}),
+and how a calling web application names the scope, under
+[The target scope]({{< relref "/docs/application#the-target-scope" >}}).
 For installation, the key that matters is `HEIMDALL_API_BASE_URL`: it is the
 address of the API the build talks to.
 
@@ -684,8 +690,10 @@ flutter build appbundle --release --dart-define=HEIMDALL_API_BASE_URL=https://he
 To serve the web bundle under a sub-path, add `--base-href=/heimdall/` to the
 web build command.
 
-A release APK is signed with the debug key until a signing configuration is
-added to the project, so it is suitable for testing and not for distribution.
+Without a signing configuration, a release APK is signed with the debug key, so
+it is suitable for testing and not for distribution. The configuration is
+described under
+[Signing the Android release]({{< relref "/docs/application#signing-the-android-release" >}}).
 Signing and packaging the Windows and Linux builds (MSIX, AppImage, deb) is not
 part of the repository.
 

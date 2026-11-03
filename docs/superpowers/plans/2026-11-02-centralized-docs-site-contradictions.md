@@ -38,3 +38,23 @@ These were stale facts on pages this task merged or moved; the code corrected th
 Not a contradiction, only a difference in precision: the heimdall-api README says `HEIMDALL_APPLICATION_TOKEN_AUDIENCE`
 must differ from `HEIMDALL_AUTH_TOKEN_AUDIENCE`; the API site adds the two audiences derived from it, and
 `ApplicationTokenOptions.Parse` checks all three. The merged page keeps the API site's wording.
+
+## Task 4: Application section and the UI parts of Installation
+
+### Between the sources
+
+| # | One source said | Another said | The code says | Kept |
+| --- | --- | --- | --- | --- |
+| 13 | Architecture, configuration: a calling web application names the scope by writing `sessionStorage.setItem('heimdall.scopeId', ...)` before sending the user to the UI. | heimdall-ui README and Operations document: the caller names it in the URL as `?scope=<PublicId>`, and writing session storage is the legacy path for a caller on the UI's own origin. | `lib/core/entry/entry_link.dart` (`takeEntryLink`) reads the `scope` query parameter, keeps a `PublicId` in session storage and removes the parameter from the address; `lib/core/scope/scope_source.dart` still reads `heimdall.scopeId` for a same-origin caller. | The README. The Application page holds the target scope in full, and the Architecture paragraph now links to it instead of repeating it. |
+
+### Against the code (no second statement)
+
+These were stale facts on pages this task wrote or touched, or statements in the heimdall-ui README that the code corrected.
+
+| # | The page said | The code says | Now |
+| --- | --- | --- | --- |
+| 14 | Installation, "UI builds from CI": the `build.yml` workflow builds each target on every push to `main` and uploads workflow artifacts (`heimdall-ui-web`, `-linux`, `-windows`, `-android`). | No `build.yml` at `82219b7`: `.github/workflows` holds only `release-windows.yml`. `yggdrasil.yml` has the Jenkins checks and `release.build` (`ci/release-build.sh`: web, Linux, Android) and `release.windows` (dispatches `release-windows.yml`). | "UI release files": the four files a release carries, and who builds each. |
+| 15 | Installation: nothing is attached to a GitHub release; releases of both repositories carry no files. | `yggdrasil.yml` lists `files` for the UI release (`dist/*.zip`, `dist/*.tar.gz`, `dist/*.apk`, and the Windows zip). heimdall-api's `yggdrasil.yml` has no `release` step. | An API release has no files; a UI release has four. |
+| 16 | Installation, "UI builds from CI": the Android APK of these builds is signed with the debug key. Installation, Build: a release APK is signed with the debug key until a signing configuration is added, which is not part of the project. | `android/app/build.gradle.kts` has a release signing configuration read from `HEIMDALL_UI_KEYSTORE_*` or `android/key.properties`; `ci/release-build.sh` binds the Jenkins keystore credentials. | The release APK is signed with the release key; the debug key is the fallback of a build with no configuration. Detail on the Application page. |
+| 17 | heimdall-ui README and Operations document, signing: without the keystore a release still builds, warns, and names the file `heimdall-ui-android-<version>-debug-signed.apk`. | `ci/release-build.sh` exits 1 when `RELEASE_VERSION` is set and `KEYSTORE_BASE64` is empty; only a run with no release version gets the `-debug-signed` file (`heimdall-ui-android-dev-debug-signed.apk`). | The code. |
+| 18 | heimdall-ui README, container image: behind yggdrasil's Traefik the proxy replaces the Referrer-Policy header. | `docker/nginx.conf` and the Operations document: yggdrasil's edge from 0.7.4 leaves the header alone (`secure-headers-ui` sets none); an earlier edge or another proxy may replace it. | The code. |

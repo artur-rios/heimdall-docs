@@ -38,3 +38,6 @@ docs/api/operations/
 docs/api/test-coverage/
 docs/api/use-case-status/
 docs/api/requirements/
+docs/application/
+docs/application/use-case-status/
+docs/application/requirements/

@@ -540,12 +540,9 @@ repository.
 | `HEIMDALL_GOOGLE_CLIENT_ID` | The Google client ID. When it is unset, the Google control is hidden. |
 | `HEIMDALL_SCOPE_ID` | The scope this build acts in, used when no calling application names one. |
 
-The UI never asks for a scope. On the web, the calling application writes the
-scope's public ID into session storage before sending the user to the UI, with
-`sessionStorage.setItem('heimdall.scopeId', '<scope-public-id>')`. The value is
-read on every use, it dies with the tab, and `HEIMDALL_SCOPE_ID` is the fallback.
-On Windows, Linux and Android there is no calling web application, so
-`HEIMDALL_SCOPE_ID` is the whole answer.
+The UI never asks for a scope. How a calling web application names it, and what
+the other platforms use, is under
+[The target scope]({{< relref "/docs/application#the-target-scope" >}}).
 
 **The bearer token is the only state the UI keeps**, and it is held in secure
 storage (`flutter_secure_storage`):
