@@ -13,8 +13,9 @@ to configure on each side. The terms (scope, role, person, application) are
 explained in the [Overview]({{< relref "/docs/overview" >}}), and the deployment
 around the API is in the [Architecture]({{< relref "/docs/architecture" >}}) page.
 
-The endpoint-level detail stays in the API's own documentation. This page links
-to the relevant pages there instead of copying them.
+The endpoint-level detail stays in the [API documentation]({{< relref "/docs/api" >}})
+section of this site. This page links to the relevant pages there instead of
+copying them.
 
 ## What a client system gets
 
@@ -99,25 +100,29 @@ sequenceDiagram
   returns a short-lived challenge token instead of the access token. The challenge
   token is accepted only by `POST /api/auth/2fa/verify`, and it can be redeemed
   once. The details are in the API's
-  [two-factor flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/two-factor/).
+  [two-factor flow]({{< relref "/docs/api/flows/two-factor" >}}).
 - **Google.** When a scope has switched Google Sign-In on, its people can sign
   in with Google through `POST /api/auth/google`. That makes them **Google
   users**, a separate kind of identity from persons: they always have the User
   role, belong to one scope and have no password. See the API's
-  [Google sign-in flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/google-sign-in/).
+  [Google sign-in flow]({{< relref "/docs/api/flows/google-sign-in" >}}).
 - **Restricted identities.** An identity whose processing has been restricted can
   still sign in, but receives a subject-rights-only token that only a few
   endpoints accept. The answer says `processingRestricted: true`.
 
 The login sequence, step by step, is in the API's
-[login flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/login/).
+[login flow]({{< relref "/docs/api/flows/login" >}}).
 
 ### The token and its claims
 
 The token is a stateless signed JWT. Heimdall keeps no revocation list, so a
 token is good until it expires. The one exception is on Heimdall's own side:
-its API refuses a token whose identity has since been deleted or restricted. A
-client system that validates tokens itself does not get that check. The
+its API refuses a token whose identity has since been deleted or restricted, a
+token whose role claim no longer matches the identity's role, and
+a person token whose security stamp has changed since it was issued (after a
+password reset, an email change, or two-factor authentication being confirmed or
+disabled or its recovery codes regenerated). A client system that validates
+tokens itself does not get those checks. The
 lifetime is set by the operator with
 `HEIMDALL_AUTH_TOKEN_EXPIRATION_IN_SECONDS`, which defaults to `3600` (one
 hour).
@@ -133,37 +138,56 @@ hour).
 | `mfaPending` | Challenge tokens only. |
 | `challengeId` | Challenge tokens only, beside `mfaPending`. |
 | `subjectRightsOnly` | Restricted sign-ins only. |
+| `sst` | Every person token: the person's security stamp, which Heimdall compares to refuse a revoked token. Not on a Google user's token. |
 
 Claims are left out rather than sent empty, and every value is a public ID, never
-an internal one.
+an internal one (`sst` is the exception: a random stamp, not an ID).
 
 The `scopePermissions` claim is a **snapshot taken when the token is issued**. A
 permission created, flagged or deleted afterwards does not change a token that is
 already out, and the holder picks the change up at the next sign-in. A User
 claims the flagged permissions of their scope, a Scope Admin claims those of every
 scope they own, and a System Admin claims none. The API's
-[scope permission claims](https://docs.artur-rios.tech/heimdall-api/docs/flows/scope-permission-claims/)
+[scope permission claims]({{< relref "/docs/api/flows/scope-permission-claims" >}})
 flow shows how a permission ends up in the token.
 
 ### Checking the token
 
-A client system that validates Heimdall's tokens itself needs the signing
-configuration they were issued with. The Heimdall API signs every token with
-`HEIMDALL_AUTH_TOKEN_SECRET`, and its deployment guide says that in each VPS
-environment the `fortuna-api` of that environment is given the same value. The
-issuer and audience are `HEIMDALL_AUTH_TOKEN_ISSUER` and
-`HEIMDALL_AUTH_TOKEN_AUDIENCE`. To rotate the secret without invalidating tokens
-in flight, the operator sets `HEIMDALL_AUTH_TOKEN_SECRET_PREVIOUS` to the
-secret currently in use, sets `HEIMDALL_AUTH_TOKEN_SECRET` to a new one and
-restarts. After one token lifetime, the operator clears
-`HEIMDALL_AUTH_TOKEN_SECRET_PREVIOUS` and restarts again. A client system that
-validates tokens itself, as Fortuna does, has to be given the new secret too,
-or it will refuse the tokens Heimdall signs with it. The steps are in the API's
-[rotating the signing secret](https://docs.artur-rios.tech/heimdall-api/docs/operations/#rotating-the-signing-secret)
-section.
-How the shared secret fits into the deployment is described in the
-[Architecture]({{< relref "/docs/architecture" >}}) page, so it is not repeated
-here.
+A client system that validates Heimdall's tokens itself needs no secret of
+Heimdall's. Heimdall signs every token with ES256, using the private key in
+`HEIMDALL_AUTH_SIGNING_KEY`, which only Heimdall holds, and publishes the
+matching public keys at `GET /.well-known/jwks.json`. The answer is a raw
+RFC 7517 key set, not the `DataOutput` envelope, and each token's header carries
+a `kid` that names the key it was signed with. The retired shared secret
+(`HEIMDALL_AUTH_TOKEN_SECRET`) is no longer read, and since API 4.0.0 every
+reader refuses an HS256 token.
+
+- **Verify against the key set.** Fetch it from the API's own host,
+  `https://heimdall-api.<domain>/.well-known/jwks.json` (the host the API is
+  published on, `PUBLIC_HOST`; the UI host does not serve it). Inside the
+  platform, use the internal edge URL
+  `http://heimdall-api.<environment>:8080/.well-known/jwks.json`. Accept ES256
+  only, and resolve the key by `kid`.
+- **Refetch on an unknown `kid`**, at most once a minute, and replace the cached
+  set with the one fetched. That is how a consumer learns of a rotated key
+  without being told.
+- **Check the issuer and the audience.** The issuer is
+  `HEIMDALL_AUTH_TOKEN_ISSUER`. A full sign-in token carries
+  `HEIMDALL_AUTH_TOKEN_AUDIENCE` exactly as configured; the two-factor challenge
+  token and the subject-rights-only token carry that value with `.2fa-challenge`
+  or `.subject-rights` appended, so a consumer that does not pin the audience
+  would take one for a sign-in.
+- **Mind the budget.** The key set shares the anonymous credential endpoints'
+  limit of 10 requests a minute per address, which a consumer that fetches only
+  on an unknown `kid` stays far below.
+
+The operator rotates the key by setting `HEIMDALL_AUTH_SIGNING_KEY_PREVIOUS` to
+the key in use and `HEIMDALL_AUTH_SIGNING_KEY` to a new one: the old key stays
+published, so tokens already issued stay valid, and a consumer needs no
+configuration change. The steps, the emergency case and the consumer
+requirements are in the API's [Signing key]({{< relref "/docs/api/operations#signing-key" >}})
+section, and [Architecture]({{< relref "/docs/architecture" >}}) describes how
+the key fits into the deployment.
 
 ## The caller key
 
@@ -200,11 +224,11 @@ How it is set up and what to know about it:
   system to the new key, then remove the old one and restart again.
 - **A leaked key** lets its holder pick a bucket, which only spreads credential
   guesses over invented addresses. The per-account lockouts still count them. The
-  API's [Threat Model Document](https://github.com/artur-rios/heimdall-api/blob/develop/docs/requirements/Threat%20Model%20Document.md)
+  API's [Threat Model Document]({{< relref "/docs/api/requirements/documents/threat-model-document" >}})
   records the residual risk as TH-32.
 
 The caller key was added in API 1.4.0. The full description is in the API's
-[operations](https://docs.artur-rios.tech/heimdall-api/docs/operations/) page,
+[operations]({{< relref "/docs/api/operations#a-client-system-calling-for-its-users--heimdall_trusted_caller_keys" >}}) page,
 under the heading "A client system calling for its users".
 
 ## Example: Fortuna
@@ -233,8 +257,9 @@ flowchart LR
 ```
 
 - **Fortuna is one Heimdall scope.** `fortuna-api` is configured with
-  `FORTUNA_HEIMDALL_BASE_URL`, which must be HTTPS, and `FORTUNA_HEIMDALL_SCOPE_ID`,
-  the public ID of its scope.
+  `FORTUNA_HEIMDALL_BASE_URL`, which is HTTPS (or plain HTTP to a private
+  address, as inside yggdrasil), and `FORTUNA_HEIMDALL_SCOPE_ID`, the public ID of
+  its scope.
 - **Credential exchanges go through `fortuna-api`.** Its Heimdall gateway calls
   Heimdall's `api/auth` endpoints (`login`, `google`, `google/sign-out`,
   `2fa/verify`, `2fa/challenge/resend`, `2fa`, `2fa/enable`, `2fa/confirm`,
@@ -243,11 +268,12 @@ flowchart LR
   attaches the scope ID where the endpoint takes one. Fortuna never keeps a
   password.
 - **Tokens are validated locally.** After sign-in, `fortuna-api` checks each
-  request's token itself, against `FORTUNA_AUTH_TOKEN_SECRET`,
-  `FORTUNA_AUTH_TOKEN_ISSUER` and `FORTUNA_AUTH_TOKEN_AUDIENCE`, and does not call
-  Heimdall on the request path. `FORTUNA_AUTH_TOKEN_SECRET` equals that
-  environment's Heimdall signing secret, and `FORTUNA_AUTH_TOKEN_SECRET_PREVIOUS`
-  covers a rotation. Its Operations & Infrastructure Document says a token
+  request's token itself, against the public keys Heimdall publishes
+  (`FORTUNA_HEIMDALL_JWKS_URL`), `FORTUNA_AUTH_TOKEN_ISSUER` and
+  `FORTUNA_AUTH_TOKEN_AUDIENCE`, and does not call Heimdall on the request path.
+  It fetches the key set only when a token names a key it does not know, at most
+  once a minute, so it holds no secret of Heimdall's and a rotation needs no
+  change on its side. Its Operations & Infrastructure Document says a token
   revoked at Heimdall stays acceptable to Fortuna until it expires, which is why
   the token lifetime is configurable.
 - **Claims it reads.** The identity mapper in `fortuna-api` reads the claims `id`,
@@ -276,14 +302,14 @@ The sources for this section are `fortuna-api`'s
 
 ## Where to go next
 
-- The API's [login flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/login/),
-  [two-factor flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/two-factor/),
-  [Google sign-in flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/google-sign-in/),
-  [password recovery flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/password-recovery/),
-  [person onboarding flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/person-onboarding/)
-  and [scope permission claims](https://docs.artur-rios.tech/heimdall-api/docs/flows/scope-permission-claims/)
+- The API's [login flow]({{< relref "/docs/api/flows/login" >}}),
+  [two-factor flow]({{< relref "/docs/api/flows/two-factor" >}}),
+  [Google sign-in flow]({{< relref "/docs/api/flows/google-sign-in" >}}),
+  [password recovery flow]({{< relref "/docs/api/flows/password-recovery" >}}),
+  [person onboarding flow]({{< relref "/docs/api/flows/person-onboarding" >}})
+  and [scope permission claims]({{< relref "/docs/api/flows/scope-permission-claims" >}})
   trace each path end to end.
-- The [API documentation]({{< relref "/docs/api" >}}) page maps every section of
-  the API's site, including the endpoint reference.
+- The [API documentation]({{< relref "/docs/api" >}}) section covers the endpoint
+  reference, the OpenAPI document, operating the API and its specification.
 - The [Installation]({{< relref "/docs/installation" >}}) page covers running the
   API and the UI.

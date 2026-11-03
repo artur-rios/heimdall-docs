@@ -1,0 +1,456 @@
+---
+title: "Operations & Infrastructure Document"
+linkTitle: "Operations & Infrastructure Document"
+weight: 70
+slug: "operations-infrastructure-document"
+description: "Hosting, the four environments, the technical foundation and the health-check feature."
+---
+
+# Operations & Infrastructure Document — Heimdall API
+
+## 0. Hosting region
+
+Personal data is stored in **Brazil**, and that is a constraint rather than an incidental fact: it
+determines which transfer rules apply to everything leaving the deployment. Moving the region means
+redoing the assessment in
+[§7 of the Data Protection Document](Data%20Protection%20Document.md), because the outbound flows to
+Mailgun and Google are measured from wherever the data sits.
+
+Note also that Brazil holds no EU adequacy decision. If any tenant scope serves data subjects in the
+EEA, hosting here is itself a restricted transfer under GDPR Chapter V — see §7.2 of that document,
+which records this as a question the controller must answer rather than an assumption.
+
+## 0.1 Encryption, backups, and restoring without undoing an erasure
+
+NFR-25. This section states what the deployment must provide and what the API does about it. Two of
+the three requirements are properties of the hosting rather than of this codebase, and are marked
+accordingly: **the controller must confirm them** — they cannot be verified from the repository.
+
+### Encryption at rest
+
+| | |
+| --- | --- |
+| **Database volume** | ✅ **Confirmed by the controller, 10 September 2026** — the data is encrypted at rest on the server |
+| **Backups** | ✅ **Confirmed, 10 September 2026** — encrypted client-side before upload, on a storage service that holds no key able to decrypt them |
+| **Application-level** | ✅ Argon2id password hashes, encrypted TOTP secrets (NFR-16), hashed tokens and recovery codes |
+
+The two rows were confirmed separately, and deliberately so: "encrypted on the server" establishes
+the volume, and a backup written elsewhere is a different artefact with its own key management. A
+regime that encrypts the live database while shipping plaintext dumps to object storage is common
+enough to be worth ruling out rather than assuming away. Both are now confirmed.
+
+The service was identified as **MEGA** on 10 September 2026, which settles the jurisdiction question
+this section previously left open. It is answered below under *Where the backups actually are*, and
+the transfer ground is recorded in
+[§7.3 of the Data Protection Document](Data%20Protection%20Document.md).
+
+The application-level protections are real and tested, and they are not a substitute. The threat
+model's TB-3 covers what an attacker recovers from *stolen rows*, which presupposes the rows were
+read; it says nothing about a disk or a snapshot leaving the building. Everything not listed in the
+third row above — every name, every address, every audit entry — is stored in clear text within the
+database and is protected only by whatever the volume beneath it provides.
+
+### Encryption in transit
+
+`UseHttpsRedirection` covers the inbound edge. The database connection is the other half, and the
+API **warns at start-up** when the connection string does not require TLS.
+
+Npgsql's default `SSL Mode` is `Prefer`, which silently falls back to an unencrypted connection when
+the server does not offer TLS — so a deployment can be sending credentials and addresses in clear
+text while looking correctly configured. Set `SSL Mode=Require`, `VerifyCA` or `VerifyFull` in
+`HEIMDALL_DATA_CONNECTIONSTRING`.
+
+It warns by default rather than refusing to start, and that is a departure from how this codebase
+treats other security configuration — TH-23's email control fails start-up in Production. Failing by
+default would take down a working deployment on upgrade over a setting the operator may not control
+directly.
+
+**Set `HEIMDALL_DATA_REQUIRE_TLS=true` to turn the warning into a refusal.** That is the right
+setting once TLS is confirmed in place: from that point a connection string that does not ask for
+encryption is a misconfiguration rather than a known state, and starting anyway would be starting in
+the one condition the check exists to prevent. It is opt-in rather than the default only so that
+enabling it is a decision somebody makes, not one that happens to them during an upgrade.
+
+### The backup regime
+
+| | | |
+| --- | --- | --- |
+| **Service** | MEGA — Mega Cloud Services Limited, Auckland, New Zealand | ✅ Confirmed 10 September 2026 |
+| **Schedule** | Daily full backup | ✅ Confirmed 10 September 2026 |
+| **Encryption** | Client-side, zero-knowledge — MEGA holds no key that decrypts the contents | ✅ Confirmed 10 September 2026 |
+| **Retention** | 35 days | ✅ Confirmed 10 September 2026 |
+| **Location** | Europe, or a country the European Commission has ruled adequate under GDPR Art. 45. Never the United States | ✅ Per MEGA's policy — but ⚠️ the individual facility is not selectable, see below |
+| **Restore testing** | Quarterly, including the reconciliation step below | ⚠️ Proposed |
+
+**Why 35 days**, since the figure is a decision rather than a default. The backup worth having is
+usually the one from *before* the problem was noticed, and silent corruption is typically found days
+or weeks late — so a short window can mean every copy held is already spoiled. Below 30 days,
+recovery is capped at under a month. Above it, a backup can outlive the 30-day erasure deadline,
+which is what makes the restore reconciliation below **mandatory rather than optional**. Thirty-five
+clears the deadline with margin, at a cost already paid: the reconciliation is built and tested.
+
+**One row remains.** **Restore testing** is what turns the reconciliation below from a procedure
+into a capability. A restore that has never been run is a hypothesis, and the reconciliation step
+that follows it has never had a real restore to reconcile.
+
+35 days is chosen against the erasure deadline rather than against recovery convenience: it is
+longer than the 30 days §4 of the retention schedule allows an erasure to take, which is what makes
+the reconciliation step below **mandatory rather than optional**. A regime keeping backups for less
+than 30 days would not need it — but would also cap disaster recovery at under a month, which for
+most operators is unacceptable.
+
+### Where the backups actually are
+
+The backups leave Brazil. That is an international transfer of **every category in §3 at once** —
+the whole database, not the single address the email flow sends — so it needs a ground of its own,
+which [§7.3 of the Data Protection Document](Data%20Protection%20Document.md) records. What follows
+is the factual basis that section rests on.
+
+**MEGA's stated position.** Files are held *"in secure facilities in Europe or in countries (such as
+New Zealand) that the European Commission has determined to have an adequate level of protection
+under Article 45 of the GDPR, depending where you are based"*, and *"none of your files are stored
+in, or made available from, the United States of America"*. New Zealand's adequacy is Commission
+Implementing Decision 2013/65/EU, confirmed still in force in the Commission's January 2024 review
+of all eleven pre-GDPR decisions.
+
+**Three caveats, none of which is glossed here.**
+
+1. **The facility is not selectable.** MEGA offers no region setting: "depending where you are
+   based" is its own routing decision, not the account holder's. So the destination is a *set* of
+   jurisdictions, not one that can be named — which is why the Location row above is marked
+   confirmed for the policy and not for the facility. The transfer ground in §7.3 is written to hold
+   for any member of that set rather than for a particular country, because pinning one is not
+   something this deployment can do.
+2. **Adequacy under Art. 45 is a GDPR finding, and the LGPD has no equivalent list.** The ANPD has
+   published no adequacy decision for any country, so LGPD Art. 33 I is unavailable here no matter
+   how many European Commission decisions apply. The LGPD ground is a different one, and §7.3 says
+   which.
+3. **Ownership is not location.** MEGA is New Zealand-incorporated and majority-held by a Hong
+   Kong-registered company. That does not move the data, and it is recorded because a control
+   question is worth writing down even when the answer does not change the analysis.
+
+**What actually carries the weight is the encryption, not the geography.** The backup is encrypted
+on this side before MEGA receives it, and MEGA holds no key that decrypts it. That is precisely EDPB
+Recommendations 01/2020 Use Case 1 — encrypted storage in a third country, for backup, where the
+data is never needed in the clear at the destination and the keys stay with the exporter — which the
+EDPB accepts as an effective supplementary measure. It is what makes the unpinnable facility
+tolerable: an adverse jurisdiction reaching the copy reaches ciphertext.
+
+> **This makes the MEGA account credentials a control on the whole database.** The encryption
+> argument above holds only while the keys do, and MEGA derives them from the account password.
+> Somebody who obtains that password obtains every backup in readable form — the one path by which a
+> full copy of the database becomes legible to an outsider. **The account must carry a unique
+> password and two-factor authentication**, and it belongs in the same custody as the production
+> database credentials rather than in a personal password manager.
+
+**What MEGA can see regardless.** File sizes, upload timestamps, and the account's IP addresses are
+visible to the service whatever the contents are encrypted with. That is unremarkable for backups —
+but it means **backup filenames must not carry personal data**. `heimdall-2026-09-10.dump` is fine;
+a filename naming a tenant or a person is a disclosure that the encryption does not cover.
+
+### Restoring without undoing an erasure
+
+> An erasure that the next restore silently undoes is not an erasure.
+
+Backups are full copies and are never edited — editing one destroys the integrity that is its whole
+purpose. So a restore reinstates whatever the database held when the backup was taken, erased people
+included, and the runbook has to put them back.
+
+**Two cases, and only one needs a human.**
+
+Where the backup was taken **after** the subject asked, the restored row still carries its deletion
+and its deadline, and NFR-20's scheduled pass completes the erasure again by itself. Nothing is
+required.
+
+Where the backup **predates the request**, the row comes back with no trace of the request ever
+having been made. Nothing inside the database knows to act, because the evidence was rolled back
+along with everything else. This is the case the reconciliation exists for.
+
+**The erasure ledger.** Every run of the anonymisation pass logs the public identifiers it
+anonymised. That line is the ledger, and it works precisely because the logs are outside the
+database and a restore cannot roll them back. The identifiers are safe to keep and to ship off the
+host: a `PublicId` whose identity has been anonymised resolves to nobody, so it is not personal
+data.
+
+**The runbook step.** After any restore:
+
+1. Collect the anonymised identifiers from the logs, covering the period from the backup's timestamp
+   to now.
+2. `POST /api/auth/erasure-reconciliation` with that list, as a System Admin.
+3. Check the response: `anonymised` is what the restore had brought back, `alreadyAnonymised` is
+   what it had not, and `notFound` is the ordinary case for most of the ledger.
+4. Record the run. The reconciliation is itself audited.
+
+The step is safe to repeat — running it twice anonymises nothing extra — and it **refuses an empty
+list**, because a reconciliation with nothing to reconcile almost always means the ledger was not
+loaded, and reporting success there would let a restore be signed off with erased people back in the
+database.
+
+## 0.2 Environments
+
+The API runs in four environments. Three of them share one Ubuntu VPS — one Docker engine, one
+PostgreSQL instance — and are deployed by [yggdrasil](https://github.com/artur-rios/yggdrasil)'s
+Jenkins; the fourth is the developer's own machine. `example.com` stands for the real domain.
+
+| Environment | Where | Deployed by | `ASPNETCORE_ENVIRONMENT` | Public hosts | Database |
+| ------ | ------ | ------ | ------ | ------ | ------ |
+| `local` | The developer's Windows machine, Docker Desktop | By hand: `docker compose --env-file docker/local.env up -d --build` | `Development` | `http://localhost:8080` | `heimdall_local`, PostgreSQL on Windows |
+| `development` | The VPS, on demand (started only when used) | Jenkins, on every push to `develop`; a stopped environment stays stopped, and `scripts/ygg.sh env start development` on the VPS turns it on | `Development` | `heimdall-api-dev.example.com`; `/api/` under `heimdall-dev.example.com` | `heimdall_development`, PostgreSQL on the VPS |
+| `homologation` | The VPS, on demand | Jenkins, on every push of a `release/x.y.z` branch | `Staging` | `heimdall-api-hml.example.com`; `/api/` under `heimdall-hml.example.com` | `heimdall_homologation`, PostgreSQL on the VPS |
+| `production` | The VPS, always on | Jenkins, on a green `release/x.y.z → main` pull request, which it then merges and tags | `Production` | `heimdall-api.example.com`; `/api/` under `heimdall.example.com` | `heimdall`, PostgreSQL on the VPS |
+
+Each environment has its own database **and its own database login**, its own token signing key
+and its own master user, so nothing issued or stored in one is accepted or readable in another. The
+env files of the three VPS environments are kept on the VPS (`/etc/yggdrasil/<environment>/`), filled
+in from the repository's `docker/<environment>.env.example` templates.
+
+**Development and homologation hold no real personal data.** Development and homologation run without Mailgun, so the
+API logs verification tokens, reset tokens and 2FA codes instead of sending them, and EF Core logs
+parameter values outside Production — which is what TH-23 in the
+[Threat Model Document](Threat%20Model%20Document.md) accepts for non-production deployments, on the
+condition that no real person's data is in them. They are tested with made-up people, and production
+data is never copied into them. Because both serve public hosts, the API runs there with EF Core's
+parameter logging and the developer exception page off (NFR-28), unless the env file sets
+`HEIMDALL_ALLOW_SENSITIVE_DIAGNOSTICS=true`; the templates leave it empty.
+
+The supported database setup gives each environment an owner role of its own for the migrations
+(`HEIMDALL_MIGRATIONS_CONNECTIONSTRING`) and an API login that owns nothing and has only the row
+privileges it needs (NFR-29, Threat Model TH-18). `scripts/sql` holds the scripts that set it up,
+for a new environment and for one whose database the API's login owns, and the check an operator
+runs as that login; the operations guide, "Database roles", gives the order. The operator applies
+them, and until then an environment runs as one login, as before.
+
+The step-by-step setup of each environment is on the documentation site, under
+[Environments and deployment](https://docs.artur-rios.tech/heimdall-api/docs/environments-and-deployment/).
+
+## 1. Introduction
+
+### 1.1 Purpose
+
+This document captures **cross-cutting platform concerns** for the **Heimdall API** that fall outside the identity domain modeled in the [Vision Document](Vision%20Document.md), [System Requirements Document](System%20Requirements%20Document.md), and [Use Case Specification Document](Use%20Case%20Specification%20Document.md).
+
+It covers two areas:
+
+- The **technical foundation** — the project scaffolding, solution architecture, and initial data infrastructure the domain features are built on.
+- **Health & monitoring** — the operational endpoints used to observe that the API and its dependencies are up, and the Prometheus metrics that show how it is performing.
+
+These are functional/operational capabilities of the *platform* rather than the identity domain, so they are documented here to keep the domain documents focused while still tracking the work formally. The specific technologies and versions this platform is built on are defined once in the [Technology Stack Document](Technology%20Stack%20Document.md) and referenced from here rather than duplicated.
+
+### 1.2 Related Backlog Items
+
+| Item | GitHub Issue | Status |
+| ------ | -------------- | -------- |
+| Project scaffolding & initial infrastructure | [#31](https://github.com/artur-rios/heimdall-api/issues/31) | ✅ Implemented |
+| Health Check feature | [#32](https://github.com/artur-rios/heimdall-api/issues/32) | ✅ Implemented |
+
+---
+
+## 2. Technical Foundation (Project Scaffolding & Initial Infrastructure)
+
+> Corresponds to issue [#31](https://github.com/artur-rios/heimdall-api/issues/31). **Status: Implemented** (delivered via PR #1 — `feat/data-infrastructure` — and preceding commits).
+
+### 2.1 Overview
+
+The solution is a **layered (DDD-style) .NET Web API**. The foundational scaffolding establishes the project structure, the Entity Framework Core data layer with the initial migration, startup seeding, and the functional test harness that the identity use cases (UC-01 … UC-29) are implemented on top of.
+
+### 2.2 Solution Architecture
+
+```mermaid
+graph TD
+    subgraph Presentation
+        WebApi[ArturRios.Heimdall.WebApi<br/>ASP.NET Core Web API host]
+    end
+    subgraph Application
+        Command[ArturRios.Heimdall.Command]
+        Query[ArturRios.Heimdall.Query]
+        Shared[ArturRios.Heimdall.Shared]
+    end
+    subgraph Domain
+        DomainLayer[ArturRios.Heimdall.Domain<br/>Entities & data model]
+    end
+    subgraph Infrastructure
+        Data[ArturRios.Heimdall.Data<br/>EF Core DbContext & migrations]
+        DB[(Database)]
+    end
+
+    WebApi --> Command
+    WebApi --> Query
+    Command --> Domain
+    Query --> Domain
+    Command --> Shared
+    Query --> Shared
+    Command --> Data
+    Query --> Data
+    Data --> DomainLayer
+    Data --> DB
+```
+
+### 2.3 Delivered Capabilities
+
+| Area | Requirement | Status |
+| ------ | ------------ | -------- |
+| IR-01 | The solution shall be organized into `Domain`, `Application` (`Command` / `Query` / `Shared` — CQRS split), `Infrastructure/Data`, and `Presentation/WebApi` layers | ✅ |
+| IR-02 | The data layer shall use Entity Framework Core with a design-time factory and an initial migration | ✅ |
+| IR-03 | Database tables shall use `snake_case`, singular naming, with EF diagnostics gated | ✅ |
+| IR-04 | Role IDs shall be pinned to the `Roles` enum values | ✅ |
+| IR-05 | On startup, the system shall seed the roles and the master System Admin | ✅ |
+| IR-06 | A migration menu script shall be provided under `scripts/` | ✅ |
+| IR-07 | Environment configuration files shall be copied to the build output | ✅ |
+| IR-08 | A functional test container shall apply migrations and assert the resulting schema | ✅ |
+| IR-09 | The data infrastructure design spec and implementation plan shall be documented under `docs/` | ✅ |
+
+### 2.4 Technology Baseline
+
+The concrete technologies, libraries, and versions behind this foundation (.NET 10 / C# 14, the `ArturRios.*` libraries, Entity Framework Core, PostgreSQL, and the testing tools) are defined in the [Technology Stack Document](Technology%20Stack%20Document.md). This section intentionally does not restate them.
+
+---
+
+## 3. Health & Monitoring
+
+> Corresponds to issue [#32](https://github.com/artur-rios/heimdall-api/issues/32). **Status: Implemented** (delivered via PR #39 — `feature/uc-30-check-api-health`). Both the public liveness endpoint and the System Admin-only detailed health check are in place.
+
+### 3.1 Overview
+
+The API exposes health endpoints so that operators, load balancers, orchestrators, and uptime monitors can observe whether the API process is running and whether its dependencies are healthy. Two endpoints are provided:
+
+1. A **basic liveness ("hello world") endpoint** — a lightweight, **public** check that the API is up.
+2. A **detailed health check endpoint** — a **System Admin-only** check that reports the status of each verified service plus an aggregate general status.
+
+The detailed check is intentionally **extensible**: for now the only verified service is the database connection, but new verifications (cache, email service, external identity providers, etc.) can be added later without changing the response contract.
+
+### 3.2 Functional Requirements
+
+| ID | Requirement | Priority |
+| ---- | ------------ | ---------- |
+| FR-HC-01 | The system shall expose a **public** liveness endpoint (`GET /api/healthcheck`) that confirms the API process is running and responding, requiring **no authentication** | High |
+| FR-HC-02 | The system shall expose a **detailed** health check endpoint (`GET /api/healthcheck/detailed`) accessible **only to System Admins** | High |
+| FR-HC-03 | The detailed health check shall verify the **database connection** | High |
+| FR-HC-04 | The detailed health check shall report the status of **each verified service individually** | High |
+| FR-HC-05 | The detailed health check shall report an **aggregate general status** of `Healthy` when all verified services are up, or `Unhealthy` when one or more verified services are down | High |
+| FR-HC-06 | The health check design shall be **extensible**, allowing new service verifications to be added without changing the response contract | Medium |
+| FR-HC-07 | The detailed health check endpoint should map the aggregate status to an appropriate HTTP status (e.g., `200 OK` when `Healthy`, `503 Service Unavailable` when `Unhealthy`) | Medium |
+| FR-HC-08 | The system shall expose a **public** readiness endpoint (`GET /api/healthcheck/ready`) that answers `200 OK` when the database responds and `503 Service Unavailable` when it does not, with only the bare status (`Healthy` / `Unhealthy`) in the body and no per-service detail | Medium |
+
+### 3.3 Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+| -------- | ---------- | ------------- | --------------- |
+| GET | `/api/healthcheck` | Basic liveness check — confirms the API is on ("hello world") | **No (Public)** |
+| GET | `/api/healthcheck/ready` | Readiness check — `200` while the database answers, `503` when it does not; bare status only | **No (Public)** |
+| GET | `/api/healthcheck/detailed` | Detailed health check — reports per-service status and an aggregate `Healthy` / `Unhealthy` general status | **SystemAdmin** |
+
+### 3.4 Detailed Health Check — Response Contract
+
+The detailed response reports a `status` (the aggregate general status) and a `services` array with one entry per verified service.
+
+**All services up:**
+
+```json
+{
+  "status": "Healthy",
+  "services": [
+    { "name": "Database", "status": "Healthy" }
+  ]
+}
+```
+
+**Database connection down:**
+
+```json
+{
+  "status": "Unhealthy",
+  "services": [
+    { "name": "Database", "status": "Unhealthy" }
+  ]
+}
+```
+
+The aggregate `status` is `Healthy` only when **every** entry in `services` is healthy; if **any** service is unhealthy, the aggregate is `Unhealthy` (FR-HC-05). Adding a new verification (FR-HC-06) simply appends another entry to `services` and participates in the same aggregation rule.
+
+### 3.5 Use Case — UC-30: Check API Health
+
+| Field | Value |
+| ------- | ------- |
+| **ID** | UC-30 |
+| **Name** | Check API Health |
+| **Actors** | Anonymous / Monitoring System (liveness), System Admin (detailed) |
+| **Description** | Observe whether the API is running (liveness) and whether its dependencies are healthy (detailed) |
+| **Preconditions** | For the detailed check, the actor is authenticated with the `SystemAdmin` role. The liveness check has no preconditions |
+| **Postconditions** | Health information is returned; no system state is modified |
+
+**Main Flow (liveness):**
+
+1. A caller (monitor, load balancer, or anonymous user) sends `GET /api/healthcheck`.
+2. The system returns a success response indicating the API is on. No authentication is required.
+
+**Main Flow (detailed):**
+
+```mermaid
+sequenceDiagram
+    actor SA as System Admin
+    participant API as Heimdall API
+    participant DB as Database
+
+    SA->>API: GET /api/healthcheck/detailed
+    API->>API: Authorize (SystemAdmin only)
+    API->>DB: Verify database connection
+    alt Database reachable
+        DB-->>API: OK
+        API->>API: Aggregate = Healthy
+    else Database unreachable
+        DB-->>API: Failure
+        API->>API: Aggregate = Unhealthy
+    end
+    API-->>SA: 200 OK / 503 { status, services[] }
+```
+
+1. A System Admin sends `GET /api/healthcheck/detailed`.
+2. The system authorizes the request; only System Admins may proceed.
+3. The system verifies each registered service (currently: the database connection).
+4. The system computes the aggregate general status (`Healthy` if all up, `Unhealthy` otherwise).
+5. The system returns the per-service statuses and the aggregate status.
+
+**Alternative Flows:**
+
+| ID | Condition | Outcome |
+| ---- | ----------- | --------- |
+| AF-30a | Detailed check requested by a caller who is not a System Admin | `403 Forbidden` |
+| AF-30b | Detailed check requested with no/invalid authentication | `401 Unauthorized` |
+| AF-30c | One or more verified services are down | `200 OK` (or `503`, per FR-HC-07) with `status = Unhealthy` and the failing service(s) marked |
+
+### 3.6 Authorization
+
+| Action | SystemAdmin | ScopeAdmin | User | Anonymous |
+| -------- | :-----------: | :----------: | :----: | :---------: |
+| Basic liveness (`GET /api/healthcheck`) | ✅ | ✅ | ✅ | ✅ |
+| Readiness (`GET /api/healthcheck/ready`) | ✅ | ✅ | ✅ | ✅ |
+| Detailed health check (`GET /api/healthcheck/detailed`) | ✅ | ❌ | ❌ | ❌ |
+
+### 3.7 Extensibility
+
+The detailed health check is designed so that additional service verifications can be registered over time. Each new verification contributes one entry to the `services` array and is folded into the same aggregate rule (any unhealthy service ⇒ `Unhealthy`). Candidate future checks include the email delivery service, caching layer, and the Google Identity Platform integration. Adding them requires no change to the response contract or to consumers that already read `status` + `services`.
+
+### 3.8 Metrics
+
+The health endpoints answer "is it up"; metrics answer "how is it doing". The API exposes them for **Prometheus** at `GET /metrics`, collected in-process with **OpenTelemetry** (see the [Technology Stack Document](Technology%20Stack%20Document.md)).
+
+| Property | Value |
+| -------- | ----- |
+| Endpoint | `GET /metrics`, Prometheus text format |
+| Port | `9464` — `HEIMDALL_METRICS_PORT`; blank means the default, `0` disables the exporter entirely |
+| Authentication | None — the port is the access control, see below |
+| Collected | ASP.NET Core request metrics and Kestrel connections, outbound `HttpClient` calls, the built-in `System.Runtime` meter (GC, heap, thread pool, exceptions), EF Core, and the Npgsql connection pool |
+| Resource | `service.name = heimdall-api` |
+
+**Access control is the port, not the host name.** The API runs behind Traefik, which forwards the client's own `Host` header, so any check on it is a check on an attacker-chosen value. The scrape endpoint is instead answered only when the connection arrived on the metrics port (`HttpContext.Connection.LocalPort`), which the socket decides. Traefik forwards to 8080; Prometheus scrapes 9464 directly over a private Docker network; Compose never publishes 9464. A request for `/metrics` on 8080 falls through to the API, which has no such route.
+
+The endpoint is the first branch in the request pipeline, so authentication, authorization, rate limiting and CORS never apply to it, and it is not part of the OpenAPI document.
+
+---
+
+## 4. Traceability
+
+| Capability | Requirements | Use Case | Issue |
+| ------------ | ------------- | ---------- | ------- |
+| Project scaffolding & initial infrastructure | IR-01 … IR-09 | — | [#31](https://github.com/artur-rios/heimdall-api/issues/31) |
+| Health & monitoring | FR-HC-01 … FR-HC-08 | UC-30 | [#32](https://github.com/artur-rios/heimdall-api/issues/32) |

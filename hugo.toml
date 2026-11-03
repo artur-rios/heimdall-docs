@@ -85,20 +85,10 @@ disableKinds = ["taxonomy", "term"]
       url = "https://github.com/artur-rios/heimdall-docs"
       icon = "fab fa-github"
       desc = "This site"
-    [[params.links.user]]
-      name = "API documentation"
-      url = "https://docs.artur-rios.tech/heimdall-api/"
-      icon = "fa-solid fa-book"
-      desc = "The heimdall-api developer site"
 
 # Documentation and About add themselves from their own front matter.
 [[menu.main]]
-  name = "API site"
-  weight = 30
-  url = "https://docs.artur-rios.tech/heimdall-api/"
-  pre = "<i class='fa-solid fa-book'></i>"
-[[menu.main]]
   name = "GitHub"
   weight = 50
-  url = "https://github.com/artur-rios/heimdall-api"
+  url = "https://github.com/artur-rios/heimdall-docs"
   pre = "<i class='fab fa-github'></i>"

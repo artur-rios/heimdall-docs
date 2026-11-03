@@ -3,7 +3,7 @@ title: Overview
 linkTitle: Overview
 weight: 10
 description: >
-  What Heimdall is, what it is not, and the concepts the rest of the documentation assumes.
+  What Heimdall is, what it is not, and the concepts and rules the rest of the documentation assumes.
 ---
 
 ## What Heimdall is
@@ -27,6 +27,47 @@ On top of that, the API supports optional two-factor authentication, logical and
 hard deletion with defined cascades, the data-subject rights of LGPD and GDPR
 (export, erasure and restriction), and, for scopes that open it,
 self-registration.
+
+Several client systems share one deployment of the API, and each calls the
+capabilities below. The diagram shows which of the services around the API each
+capability depends on.
+
+```mermaid
+graph LR
+    subgraph Clients
+        C1[Client System A]
+        C2[Client System B]
+        C3[Client System N]
+    end
+
+    subgraph Heimdall["Heimdall API"]
+        AUTH[Authentication]
+        TFA[Two-Factor Auth]
+        GS[Google Sign-In]
+        PM[Person Management]
+        AM[Application Management]
+        SM[Scope Management]
+        SPM[Scope Permissions]
+        PR[Password Recovery]
+        EV[Email Verification]
+        AL[Audit Logging]
+    end
+
+    subgraph Infrastructure
+        DB[(PostgreSQL)]
+        EMAIL[Mailgun]
+        GOOGLE[Google Identity]
+    end
+
+    C1 & C2 & C3 --> AUTH & PM & AM & SM & GS
+    AUTH --> TFA
+    AUTH & PM & AM & SM & SPM & GS & TFA & AL --> DB
+    PR & EV & TFA --> EMAIL
+    GS --> GOOGLE
+```
+
+Every successful write also produces an audit trail entry (**NFR-09**); see
+[Audit logging]({{< relref "/docs/api/flows/audit-logging" >}}).
 
 ## What it is not
 
@@ -59,37 +100,76 @@ owners, users, applications, Google users and permissions, and keeps them apart
 from every other scope. Google Sign-In is a per-scope setting that is off by
 default. Since API 1.4.0 a scope can also open self-registration, which is off by
 default, and can point its verification and password-reset emails at the client
-system's own screens. The full rules are in the API's
-[overview](https://docs.artur-rios.tech/heimdall-api/docs/overview/).
+system's own screens (see
+[Pointing a scope at a client application's screens](../api/operations/#pointing-a-scope-at-a-client-applications-screens)).
 
 ### Roles
 
-There are three roles, held in a closed set. A **System Admin** belongs to no
-scope and governs the whole system; since API 1.2.0 a System Admin may also own a
-scope. A **Scope Admin** owns one or more scopes, manages the users and
-applications in them, and can add co-owners. A Scope Admin who owns no live scope
-cannot sign in. A **User** belongs to exactly one scope and can sign in, view
-and update their own profile, recover a password and verify an email address. The
-authorization matrix is in the API's
-[system requirements](https://docs.artur-rios.tech/heimdall-api/docs/requirements/system-requirements-document/).
+There are three roles, held in a closed set of three rows: `SystemAdmin`,
+`ScopeAdmin` and `User`. A **System Admin** belongs to no scope and governs the
+whole system; since API 1.2.0 a System Admin may also own a scope. A **Scope
+Admin** owns one or more scopes, manages the users and applications in them, and
+can add co-owners. A Scope Admin who owns no live scope cannot sign in. A
+**User** belongs to exactly one scope and can sign in, view and update their own
+profile, recover a password and verify an email address. The authorization
+matrix is in §7 of the
+[System Requirements Document](../api/requirements/documents/system-requirements-document/).
 
 ### Persons
 
 A person is a human identity: a name, an email, a password hash, a role and a
-deletion status. A User's scope is the one scope they belong to, a Scope Admin's
-scopes are the ones they own, and a System Admin has none. The same email can
-exist as a User in several scopes, while administrators' emails are unique across
-the system. Outside the database a person is addressed by a public GUID, never by
-the internal id. How a sign-in finds the right person is described in the API's
-[login flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/login/).
+deletion status. The same email can exist as a User in several scopes, while
+administrators' emails are unique across the system. How a sign-in finds the
+right person is described in the
+[login flow]({{< relref "/docs/api/flows/login" >}}).
+
+A person's relationship to scopes is derived from its role, and it is held in two
+join tables rather than on the person: a User's scope is the one scope they
+belong to, a Scope Admin's scopes are the ones they own, and a System Admin has
+none.
+
+```mermaid
+flowchart TD
+    P[Person] --> R{Role}
+    R -->|SystemAdmin| S1["Belongs to no scope<br/>Governs the whole system<br/>May own scopes via SCOPE_OWNER"]
+    R -->|ScopeAdmin| S2["Owns 1..n scopes<br/>via SCOPE_OWNER"]
+    R -->|User| S3["Belongs to exactly 1 scope<br/>via SCOPE_USER"]
+```
+
+`SCOPE_OWNER` is many-to-many: a scope has one or more owners, and an
+administrator may own several scopes. An administrator with a `SCOPE_USER` row,
+or a User with two, is not representable, because the join tables carry the
+constraints: `SCOPE_USER.PersonId` is unique, and `SCOPE_OWNER` has a composite
+key. The person row also carries a copy of a User's scope, `scope_id`, which
+exists so that a database index can keep a User's email unique within their
+scope. `SCOPE_USER` remains the relationship; a read that only needs to know
+which scope a User is in, such as finding the scope's email links, may take the
+copy directly. The
+[domain model]({{< relref "/docs/architecture/domain-model#the-scope-a-user-belongs-to-twice" >}})
+explains why.
+
+### Two identifiers per entity
+
+Every top-level entity carries both:
+
+- **`Id`**, an auto-incrementing `bigint`. It is the physical primary key and the
+  target of every foreign key, and it **never** leaves the database.
+- **`PublicId`**, a GUID generated at creation. It is the identifier used in API
+  paths, response bodies and token claims, so outside the database a person, a
+  scope or an application is always addressed by it.
+
+The split keeps record counts and creation order, which a sequential integer
+would leak, out of anything a caller can see, while the database keeps compact
+integer keys for joins and indexes. This is **NFR-15**; the
+[System Requirements Document](../api/requirements/documents/system-requirements-document/)
+records its one documented and accepted exception (`Person.RoleId`).
 
 ### Applications
 
 An application is a non-human identity, usually another system. It lives in
 exactly one scope and is owned by one Scope Admin or System Admin who owns that
 scope. A User may never own an application. The endpoints that manage them are
-listed in the API's
-[API reference](https://docs.artur-rios.tech/heimdall-api/docs/api-reference/).
+listed in the [API reference]({{< relref "/docs/api/reference" >}}).
 
 ### Scope permissions
 
@@ -99,17 +179,34 @@ permissions are added to its `scopePermissions` claim, so a client system can
 read them without a further call. The claim is a snapshot, and a change is picked
 up at the next sign-in. A User gets the permissions of their scope, a Scope Admin
 gets those of all the scopes they own, and a System Admin gets none. See the
-API's
-[scope permission claims](https://docs.artur-rios.tech/heimdall-api/docs/flows/scope-permission-claims/)
+[scope permission claims]({{< relref "/docs/api/flows/scope-permission-claims" >}})
 flow.
 
 ### Google users
 
 A Google user is an identity authenticated by Google instead of a password. It
 always has the User role, belongs to exactly one scope, and is stored apart from
-persons. A scope must switch Google Sign-In on before its people can use it.
-Google users do not get two-factor authentication. The sequence is in the API's
-[Google sign-in flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/google-sign-in/).
+persons, in its own table with a direct `ScopeId`. A scope must switch Google
+Sign-In on before its people can use it. Google users do not get two-factor
+authentication. The sequence is in the
+[Google sign-in flow]({{< relref "/docs/api/flows/google-sign-in" >}}).
+
+### Two kinds of caller, two kinds of token
+
+| | Password identities | Google identities |
+| --- | --- | --- |
+| Entity | `Person` | `GoogleUser` |
+| Credentials | Password hash + per-person salt (Argon2id) | Delegated to Google; no hash stored |
+| Sign-in | `POST /api/auth/login` | `POST /api/auth/google` |
+| Roles reachable | `User`, `ScopeAdmin`, `SystemAdmin` | `User` only, always |
+| Second factor | Optional 2FA (app / email / recovery codes) | Google's own account security |
+
+Both produce the same kind of stateless, signed JWT. Validating a token reads no
+database: the identity is rebuilt from the token's claims, which is why the
+sign-out endpoint revokes nothing. The identity a token names is still checked
+on every authenticated request, with one indexed read, so a token whose person or
+Google user has been deleted is refused before it expires (see
+[The HTTP request pipeline]({{< relref "/docs/architecture#the-http-request-pipeline" >}})).
 
 ### Two-factor authentication
 
@@ -118,19 +215,34 @@ second factor is an authenticator app, an email code, or both, backed by ten
 single-use recovery codes. Once it is active, sign-in returns a short-lived
 challenge token instead of the access token, and that challenge token can be
 redeemed only once. The setup, the challenge and the recovery codes are traced in
-the API's
-[two-factor flow](https://docs.artur-rios.tech/heimdall-api/docs/flows/two-factor/).
+the [two-factor flow]({{< relref "/docs/api/flows/two-factor" >}}).
 
 ### Deletion strategies
 
-Deletion is either logical or hard. A logical delete sets a flag and keeps the
-row; deleting a scope this way cascades to its users, Google users and
-applications, but not to its owners or its permissions. A hard delete removes the
-row along with the records that depend on it, and only a System Admin can do it.
-A scope must always keep at least one owner, so removing a scope's last owner, or
-hard-deleting the person who is its last owner, is rejected. The cascade
-rules are in the API's
-[domain model](https://docs.artur-rios.tech/heimdall-api/docs/domain-model/).
+Deletion is either logical or hard. A logical delete sets a flag (`IsDeleted`)
+and keeps the row; deleting a scope this way cascades to its users, Google users
+and applications, but not to its owners or its permissions. A hard delete removes
+the row along with the records that depend on it, and only a System Admin can do
+it. A scope must always keep at least one owner, so removing a scope's last
+owner, or hard-deleting the person who is its last owner, is rejected. The
+cascade rules are in the
+[domain model]({{< relref "/docs/architecture/domain-model#deletion-cascades" >}}).
+
+## Where the rules are written down
+
+These pages describe what was built. The specification is the set of numbered
+requirements and use cases in the API's
+[Requirements]({{< relref "/docs/api/requirements" >}}):
+
+- `FR-…` are the functional requirements, grouped by capability (`FR-AU-…`
+  authentication, `FR-GO-…` Google Sign-In, `FR-2F-…` two-factor, and so on).
+- `NFR-…` are the non-functional requirements (security, data integrity,
+  validation, logging).
+- `UC-…` are the use cases, each with a main flow and numbered alternative flows
+  (`AF-11a`, `AF-11b`, …).
+
+The source code cites these identifiers in its comments, so a line of code can be
+traced back to the flow that demanded it.
 
 ## Where to go next
 
@@ -141,5 +253,5 @@ rules are in the API's
 - For the endpoints, the generated reference and the specification, read [API documentation]({{< relref "/docs/api" >}}).
 - For the source, the releases and the specification documents, read [Repositories]({{< relref "/docs/repositories" >}}).
 
-The [Heimdall API documentation](https://docs.artur-rios.tech/heimdall-api/docs/)
-holds the detailed rules behind everything summarised here.
+The [API documentation]({{< relref "/docs/api" >}}) holds the detailed rules
+behind everything summarised here.

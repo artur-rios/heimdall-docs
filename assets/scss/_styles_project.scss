@@ -94,3 +94,70 @@
   overflow-x: auto;
   max-width: 100%;
 }
+
+// --- Swagger UI in the API explorer ----------------------------------------
+//
+// Swagger UI is a self-contained widget with its own light-only stylesheet, embedded by the
+// swagger-ui shortcode (layouts/_shortcodes/swagger-ui.html). Two things have to be reconciled with
+// the page around it.
+//
+// Width: the widget assumes a full-width page and lays out at Docsy's text column, which leaves the
+// operation rows cramped. Let it use the space the column does not need, and scroll rather than push
+// the page sideways when it still cannot fit.
+.heimdall-swagger {
+  overflow-x: auto;
+
+  .swagger-ui .wrapper {
+    padding: 0;
+    max-width: none;
+  }
+
+  // The widget renders its own title, version and description block, which duplicates the page's
+  // front matter and the paragraph above it.
+  .swagger-ui .information-container {
+    display: none;
+  }
+
+  // Swagger UI always renders the scheme container, which houses the Authorize button and the
+  // servers dropdown. This page has neither — Authorize is removed, and the document declares no
+  // servers — so what is left is an empty bordered bar, 60px of nothing. In dark mode the inversion
+  // below turned it into a solid black slab, which is how it got noticed.
+  .swagger-ui .scheme-container {
+    display: none;
+  }
+}
+
+// Colour: Swagger UI ships no dark theme, and restyling several hundred of its selectors would be a
+// standing maintenance cost for one embedded widget. Inverting it and rotating the hues back gives a
+// dark widget whose colours (the green POST, the red DELETE) survive, at the price of a second
+// inversion on anything already dark -- so images and syntax-highlighted bodies are inverted again
+// to come out as authored.
+[data-bs-theme='dark'] .heimdall-swagger {
+  filter: invert(1) hue-rotate(180deg);
+
+  img,
+  .swagger-ui .microlight {
+    filter: invert(1) hue-rotate(180deg);
+  }
+
+  // The tag filter is the one white surface left that is worth keeping, and inverting #fff gives
+  // #000 — a pure black box against a page whose background is a much softer grey. Cancelling the
+  // inversion on it lets it be styled in the page's own tokens instead: authored dark, inverted to
+  // light by this rule, inverted back to dark by the parent. Its border is what makes it legible as
+  // a field once it is no longer a bright rectangle.
+  .swagger-ui .operation-filter-input {
+    filter: invert(1) hue-rotate(180deg);
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border: 1px solid var(--bs-border-color);
+  }
+}
+
+// The explorer removes Swagger UI's Authorize button (see layouts/_shortcodes/swagger-ui.html): there is
+// no server behind the page, so a token could never be attached to anything. The per-operation
+// padlocks stay, because which endpoints need a token is worth reading — but clicking one opens the
+// same authorization dialog the button would have, so they are demoted to indicators.
+.heimdall-swagger .swagger-ui .authorization__btn {
+  pointer-events: none;
+  cursor: default;
+}

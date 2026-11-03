@@ -1,0 +1,69 @@
+{{- /*
+  Link render hook.
+
+  The requirements documents under content/en/docs/api/requirements/documents/ and
+  content/en/docs/application/requirements/documents/ are copies that a CI sync takes from the
+  heimdall-api and heimdall-ui repositories. Their links are written for GitHub, and two kinds
+  need translating for the web:
+
+    1. A sibling document link — "Technology%20Stack%20Document.md" — becomes that page's
+       permalink in this section.
+    2. A source-file link — "../src/...", "../tests/...", "../lib/...", or a link up to a file in
+       the repository root such as "../../CONTRIBUTING.md" — has no page on this site at all, so it
+       becomes a GitHub blob URL in the repository the document belongs to: a document under
+       docs/api/requirements/documents/ maps to heimdall-api, one under
+       docs/application/requirements/documents/ to heimdall-ui.
+
+  Only those copied documents are translated. Every other page — absolute URLs, in-page anchors,
+  and the relative links written by this site's own hand-written pages, "../../user-guide/"
+  included — is passed through untouched.
+*/ -}}
+{{- $dest := .Destination -}}
+{{- $u := urls.Parse $dest -}}
+{{- $external := false -}}
+
+{{- /* The repository a copied document's source links point into; empty for every other page. */ -}}
+{{- $repo := "" -}}
+{{- $pagePath := .Page.Path -}}
+{{- if hasPrefix $pagePath "/docs/api/requirements/documents/" -}}
+  {{- $repo = "https://github.com/artur-rios/heimdall-api" -}}
+{{- else if hasPrefix $pagePath "/docs/application/requirements/documents/" -}}
+  {{- $repo = "https://github.com/artur-rios/heimdall-ui" -}}
+{{- end -}}
+{{- $branch := "main" -}}
+
+{{- if not $u.IsAbs -}}
+  {{- $path := $u.Path -}}
+  {{- if and $path (strings.HasSuffix (lower $path) ".md") (not (strings.Contains $path "/")) -}}
+    {{- /*
+      Sibling document in the same section. Resolved by matching the source file name rather
+      than by urlizing it, so a page that overrides its slug still resolves correctly.
+    */ -}}
+    {{- $base := $path | strings.TrimSuffix ".md" | strings.TrimSuffix ".MD" -}}
+    {{- with .Page.Parent -}}
+      {{- range .Pages -}}
+        {{- if and .File (eq .File.BaseFileName $base) -}}
+          {{- $dest = .RelPermalink -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- with $u.Fragment -}}
+      {{- $dest = printf "%s#%s" $dest . -}}
+    {{- end -}}
+  {{- else if and $repo (or (hasPrefix $path "../src/") (hasPrefix $path "../tests/") (hasPrefix $path "../scripts/") (hasPrefix $path "../lib/") (hasPrefix $path "../test/") (hasPrefix $path "../tool/") (hasPrefix $path "../api-client/")) -}}
+    {{- /* A file in the repository, with no page here. */ -}}
+    {{- $dest = printf "%s/blob/%s/%s" $repo $branch (strings.TrimPrefix "../" $path) -}}
+    {{- with $u.Fragment -}}
+      {{- $dest = printf "%s#%s" $dest . -}}
+    {{- end -}}
+    {{- $external = true -}}
+  {{- else if and $repo (hasPrefix $path "../../") -}}
+    {{- /* The documents sit two folders below the repository root: a file there, such as CONTRIBUTING.md. */ -}}
+    {{- $dest = printf "%s/blob/%s/%s" $repo $branch (strings.TrimPrefix "../../" $path) -}}
+    {{- with $u.Fragment -}}
+      {{- $dest = printf "%s#%s" $dest . -}}
+    {{- end -}}
+    {{- $external = true -}}
+  {{- end -}}
+{{- end -}}
+<a href="{{ $dest | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}{{ if $external }} target="_blank" rel="noopener"{{ end }}>{{ .Text | safeHTML }}</a>
