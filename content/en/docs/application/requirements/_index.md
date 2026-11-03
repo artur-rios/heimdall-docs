@@ -2,6 +2,17 @@
 title: 'Requirements'
 linkTitle: 'Requirements'
 weight: 90
+cascade:
+  # The documents/ pages are copies that a sync takes from heimdall-ui; their edit and view links
+  # must open the source file there, not the copy in this repository.
+  - target:
+      path: '/docs/application/requirements/documents/**'
+    github_repo: 'https://github.com/artur-rios/heimdall-ui'
+    github_branch: 'main'
+    github_subdir: 'docs/requirements'
+    path_base_for_github_subdir:
+      from: '^.*content.en.docs.application.requirements.documents.'
+      to: ''
 description: 'The specification: vision, system requirements, use cases, technology stack, testing, workflow, and operations.'
 ---
 
