@@ -22,7 +22,7 @@ file says how to build, test and branch.
 
 Jenkins runs the checks, the releases and the deploys of every repository from the
 `yggdrasil.yml` file at its root (see
-[yggdrasil](https://github.com/artur-rios/yggdrasil)), not from GitHub workflows. A release
+[yggdrasil](https://github.com/artur-rios/yggdrasil)), not from GitHub workflows (the UI's Windows build is the one exception: Jenkins dispatches it). A release
 of the API or the UI is a `release/x.y.z` branch merged into `main` by a pull request that Jenkins
 merges, and it is published on Forgejo and mirrored to GitHub. This site is deployed by Jenkins
 on every push to `main`.
