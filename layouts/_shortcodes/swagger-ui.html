@@ -1,0 +1,38 @@
+{{- /*
+  Swagger UI over the published OpenAPI document (static/api/openapi/heimdall.json, a copy that a
+  CI sync takes from heimdall-api). Usage: {{< swagger-ui >}}
+
+  The widget is a self-contained bundle pinned to one version, loaded from a CDN with
+  subresource-integrity hashes. Width and dark mode are handled in assets/scss/_styles_project.scss,
+  against .heimdall-swagger.
+*/ -}}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.13/swagger-ui.css" integrity="sha384-tRpWwikYYdk1+1Mu0osh0Tz/Ay5xgS+s/Nf2Aa7GVAFtZLFdJlAbozfrq4g+xHBK" crossorigin="anonymous">
+
+<div id="swagger-ui" class="heimdall-swagger"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.13/swagger-ui-bundle.js" integrity="sha384-PsJla434CobCNv3y1K4wRavOqkUAvwGEQEfbUmI98CCqqGCJsmuDsgIjM6ZQQODP" crossorigin="anonymous"></script>
+<script>
+  window.addEventListener('load', function () {
+    window.SwaggerUIBundle({
+      url: {{ "api/openapi/heimdall.json" | relURL }},
+      dom_id: '#swagger-ui',
+      // No server is reachable from this page, so an enabled "Try it out" would only ever produce a
+      // failed fetch. The API's own Swagger UI is where requests get sent.
+      supportedSubmitMethods: [],
+      docExpansion: 'none',
+      defaultModelsExpandDepth: 0,
+      deepLinking: true,
+      filter: true,
+      tryItOutEnabled: false,
+      presets: [window.SwaggerUIBundle.presets.apis],
+      // Authorizing has nothing to authorize against here: a token entered on this page could only
+      // be attached to a request, and no request can be sent. The button is removed rather than
+      // hidden, so it cannot be reached by keyboard either. The per-operation padlocks stay — they
+      // are what says an endpoint needs a token, which is worth reading even when it cannot be
+      // supplied — and are made inert in assets/scss/_styles_project.scss so they do not open the
+      // same dead dialog.
+      plugins: [{ wrapComponents: { authorizeBtn: function () { return function () { return null; }; } } }],
+      layout: 'BaseLayout'
+    });
+  });
+</script>

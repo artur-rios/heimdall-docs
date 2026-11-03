@@ -1,3 +1,4 @@
 Dockerfile text eol=lf
 .dockerignore text eol=lf
 *.sh text eol=lf
+static/api/openapi/heimdall.json text eol=lf

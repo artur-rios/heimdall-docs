@@ -1,0 +1,158 @@
+---
+title: "Technology Stack Document"
+linkTitle: "Technology Stack Document"
+weight: 40
+description: "The technologies, libraries, and pinned versions Heimdall UI is built on."
+---
+
+# Technology Stack Document — Heimdall UI
+
+## 1. Purpose
+
+This document is the **single source of truth for the technologies used to build Heimdall UI** — the
+framework, language, state management, routing, networking, storage, code generation, and testing
+tools, together with the version each is pinned to and the role it plays.
+
+Every other document references this one for technical choices instead of restating them, so that
+versions and roles are maintained in exactly one place.
+
+> **Rule:** when a technology choice changes, it changes here first. The authoritative resolved
+> versions live in `pubspec.lock`; the tables below record the constraint declared in `pubspec.yaml`
+> and what each dependency is for.
+
+---
+
+## 2. Platform and language
+
+| Concern | Choice | Notes |
+| --- | --- | --- |
+| Framework | **Flutter 3.47.7** (stable) | One codebase for every target. |
+| Language | **Dart 3.13.5+** | `pubspec.yaml` requires `sdk: ^3.13.5`; Flutter 3.47.7 and newer ship it. A Flutter whose bundled Dart is older (3.13.2, say) fails `flutter pub get`. Pattern matching, sealed classes, and exhaustive `switch` expressions are used freely, and the session and result models depend on them. |
+| Design system | **Material 3** | `useMaterial3: true`, with both schemes derived from one seed color. |
+| Targets | **Web, Windows, Linux, Android** | No iOS or macOS platform folder exists. |
+| Analysis | `flutter_lints`, with `strict-casts`, `strict-raw-types` and `strict-inference` enabled, plus the lints `always_declare_return_types`, `avoid_print`, `close_sinks`, `directives_ordering`, `discarded_futures`, `prefer_const_constructors`, `prefer_final_locals`, `require_trailing_commas`, `unawaited_futures` and `unnecessary_lambdas` | Generated code is excluded from analysis. |
+
+---
+
+## 3. Application dependencies
+
+| Package | Constraint | Role |
+| --- | --- | --- |
+| **flutter_riverpod** | `^3.4.3` | Dependency injection and state. Providers are the only global wiring; each feature owns its own. `Notifier` and `AsyncNotifier` back the session and the theme mode. |
+| **go_router** | `^18.1.1` | Declarative routing. Gives the web target real URLs, and hosts the single redirect that guards every route by session and role. |
+| **dio** | `^5.11.1` | HTTP. One configured instance is shared by every generated client, carrying the bearer-token interceptor and the timeouts. Debug builds add the application's own request log, one line per request with the method, path, status and duration; it never prints headers, query strings, bodies or an error's text. |
+| **retrofit** | `^4.10.0` | The generated clients' runtime: turns the annotated interfaces `swagger_parser` emits into `dio` calls. |
+| **json_annotation** | `^4.12.0` | The generated models' runtime, paired with `json_serializable` at build time. |
+| **flutter_secure_storage** | `^11.2.0` | Token storage: Keystore on Android, DPAPI on Windows, libsecret on Linux, and WebCrypto-encrypted session storage on the web, so the token is kept per tab. |
+| **shared_preferences** | `^2.5.6` | Non-sensitive preferences — currently only the chosen theme mode. Never used for tokens. |
+| **google_sign_in** | `^7.2.0` | Obtains the Google ID token the API exchanges for a Heimdall token. |
+| **qr** | `^4.0.0` | Encodes the `otpAuthUri` of a two-factor setup into a QR matrix (FR-AU-18). Pure Dart, no platform code: the drawing is this repository's own `QrCodeView`, so the dependency is an encoder rather than a widget. |
+| **flutter_markdown_plus** | `^1.0.12` | Renders the privacy notice at `/privacy`, which is the Heimdall API's Markdown file bundled verbatim. The maintained fork of `flutter_markdown`, which Google discontinued. |
+| **url_launcher** | `^6.3.3` | Opens the privacy notice's links — the contact address in the mail client, the rest in the browser. |
+| **path_provider** | `^2.1.6` | Finds the downloads folder a data export (UI-30) is saved to off the web; the web hands the file to the browser as a download instead. Already in the tree through `flutter_secure_storage`; depended on directly because the application now calls it. |
+
+---
+
+## 4. Code generation
+
+| Package | Constraint | Role |
+| --- | --- | --- |
+| **swagger_parser** | `^1.45.0` | Generates the DTOs and retrofit clients in `packages/heimdall_api_client/lib` from `api/heimdall.json`. Pure Dart, so no Java toolchain is required. Configured by `swagger_parser.yaml`. |
+| **build_runner** | `^2.17.1` | Runs the generators. |
+| **json_serializable** | `^6.14.1` | Emits the `fromJson`/`toJson` bodies for the generated models. |
+| **retrofit_generator** | `^10.2.12` | Emits the client implementations. |
+
+### 4.1 The generation pipeline
+
+Generation runs as one command, which is what CI reruns:
+
+```bash
+dart run tool/generate_api_client.dart
+```
+
+It does three things in order:
+
+1. Runs `swagger_parser` over `api/heimdall.json`.
+2. Runs `build_runner` inside the package to emit the `.g.dart` bodies.
+3. Runs `dart format` over the package, because the generators' own line breaking differs from what
+   `dart format` at the repository root would produce — and a difference there would fail the drift
+   check for no real reason.
+
+The pipeline is deterministic: running it twice over an unchanged specification produces byte-identical
+output, which is what makes the drift check meaningful.
+
+> **A note on what this pipeline used to carry.** Until the API's
+> [server-populated fields fix](https://github.com/artur-rios/heimdall-api/pull/83), several
+> operations published both a path parameter `scopeId` and a query parameter `ScopeId` — the filter
+> object's own property, which the path already supplied — alongside `ActingPersonId` and
+> `ActingRole`. Dart identifiers are case-sensitive but the generator lower-camel-cases both names,
+> so the emitted method declared `scopeId` twice and did not compile, and the pipeline carried a step
+> that renamed the query side. The API now guards its published contract against server-populated
+> fields with its own test, so that step has been removed rather than kept as a standing workaround.
+> A recurrence would surface as a compilation failure in the generated package, which CI catches.
+
+The generated package is committed, and CI regenerates it and fails on any difference — the same
+drift guard the API applies to its own specification. Everything under
+`packages/heimdall_api_client/lib` is generated and is never hand-edited; the package's own
+`pubspec.yaml` is not generated and is maintained by hand. Ergonomic wrappers belong in the
+consuming feature's `data/` layer.
+
+The package's public entry point is `package:heimdall_api_client/export.dart`, and its clients are
+named after their area — `AuthClient`, `ScopeClient`, `PersonClient`, `ApplicationClient`,
+`ScopePermissionClient`, `GoogleUserClient`, and `HealthCheckClient` — each constructed as
+`AuthClient(dio)`.
+
+---
+
+## 5. Testing
+
+| Package | Constraint | Role |
+| --- | --- | --- |
+| **flutter_test** | SDK | The test framework for unit and widget tests. |
+| **mocktail** | `^1.0.5` | The single mocking library, for repositories and other collaborators. Chosen over `mockito` because it needs no code generation. Do not introduce a second one. |
+
+How tests are written — naming, structure, and what each use case must cover — is defined in the
+[Testing Specification Document](Testing%20Specification%20Document.md).
+
+Dio's own `HttpClientAdapter` is replaced in tests with a local adapter that answers from memory, so
+no test reaches the network.
+
+---
+
+## 6. Continuous integration
+
+| Tool | Role |
+| --- | --- |
+| **Jenkins** (yggdrasil) | Runs the analyze-and-test gate, the web build check and the client drift check (`ci/`), builds the release files, and deploys. |
+| **GitHub Actions** | Builds the Windows release files (`release-windows.yml`) on the GitHub copy. |
+| **ci/flutter-env.sh** | Installs the pinned Flutter version in the CI image (`subosito/flutter-action` in the Windows workflow). |
+
+---
+
+## 7. Version summary
+
+| Category | Package / tool | Version |
+| --- | --- | --- |
+| Framework | Flutter | `3.47.7` |
+| Language | Dart | `3.13.5+` |
+| State | flutter_riverpod | `^3.4.3` |
+| Routing | go_router | `^18.1.1` |
+| HTTP | dio | `^5.11.1` |
+| HTTP | retrofit | `^4.10.0` |
+| Serialization | json_annotation | `^4.12.0` |
+| Storage | flutter_secure_storage | `^11.2.0` |
+| Storage | shared_preferences | `^2.5.6` |
+| Authentication | google_sign_in | `^7.2.0` |
+| Encoding | qr | `^4.0.0` |
+| Rendering | flutter_markdown_plus | `^1.0.12` |
+| Platform | url_launcher | `^6.3.3` |
+| Platform | path_provider | `^2.1.6` |
+| Generation | swagger_parser | `^1.45.0` |
+| Generation | build_runner | `^2.17.1` |
+| Generation | json_serializable | `^6.14.1` |
+| Generation | retrofit_generator | `^10.2.12` |
+| Testing | mocktail | `^1.0.5` |
+| Lints | flutter_lints | `^6.0.0` |
+
+> The exact resolved versions are in `pubspec.lock`, which is committed. When a constraint here and
+> the lock file disagree, the lock file is what was built and this table is what is wrong.

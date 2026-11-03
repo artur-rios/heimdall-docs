@@ -18,3 +18,6 @@ docs/user-guide/google-users/
 docs/integrating/
 docs/api/
 docs/repositories/
+docs/api/requirements/documents/vision-document/
+docs/application/requirements/documents/vision-document/
+api/coverage-report/index.html

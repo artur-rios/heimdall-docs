@@ -1,0 +1,818 @@
+---
+title: "Testing Specification Document"
+linkTitle: "Testing Specification Document"
+weight: 50
+description: "How each use case is tested — the unit and functional standards and the required coverage."
+---
+
+# Testing Specification Document — Heimdall API
+
+## 1. Purpose
+
+This document defines **how a use case is tested once it has been implemented**. It is a standard
+to be followed by any human or agent that builds tests for this project. Following it guarantees
+that every use case (UC-01 … UC-35 in the [Use Case Specification Document](Use%20Case%20Specification%20Document.md))
+receives the same shape of testing, with the same tools, naming, and structure.
+
+The rule is simple:
+
+> **After a use case is developed, tests are built for it in the same change — before the use case
+> is considered done.** A use case without its tests is an incomplete use case.
+
+## 2. Testing philosophy
+
+1. **Behavior-driven.** Tests describe *behavior*, not implementation. Every test is written in the
+   **Given / When / Then** style and is named accordingly.
+2. **Test at the right layer.** Business logic (Command/Query handlers and any Domain class that
+   implements behavior) is covered by **unit tests**. The Presentation layer (the Web API) is
+   covered by **functional (end-to-end) tests**.
+3. **Isolation in unit tests.** A unit test exercises *one* class. Every external dependency of that
+   class is replaced by a test double (fake/mock). Only the behavior of the method under test is
+   asserted.
+4. **Realism in functional tests.** A functional test exercises the API exactly as a client would —
+   over HTTP, against a **real PostgreSQL database** provisioned on the fly with Testcontainers.
+   Both the **API response** and the **resulting database state** are asserted.
+5. **Same pattern every time.** The workflow in §9 is applied identically to every use case, so the
+   test suite stays predictable as the system grows.
+
+### 2.1 The coverage floor
+
+Merged line coverage must stay at or above **90%**. `scripts/coverage.py` enforces it, in CI and on
+a developer machine alike, and the build fails below it. It was measured at 96.7% when the floor was
+introduced, so the number is a floor with room under it rather than one the suite has to be nursed
+against.
+
+That gap is deliberate. A threshold set just under the current figure fails on the next honest
+refactor and teaches everybody to lower it; one set well under catches the thing worth catching,
+which is a subsystem arriving with no tests at all, not a method. Coverage is a floor here and
+nothing more — §3 is what actually decides whether a use case is tested, and a change can hold 96%
+while testing none of the behavior that matters.
+
+Branch coverage is reported but not gated. It was 77.4% at the same measurement, so gating it at 90%
+would have failed the build on the day it was added, and a threshold chosen to be whatever passes
+measures nothing. Raising it is a decision to take deliberately, by writing the missing tests first.
+
+## 3. What to test for each use case
+
+When a use case is implemented, walk this decision list and produce every applicable test:
+
+| Artifact produced by the use case | Test kind | Test project |
+| --- | --- | --- |
+| A **Command** handler (`*CommandHandler`) | Unit | `*.Command.Tests` |
+| A **Query** handler (`*QueryHandler`) | Unit | `*.Query.Tests` |
+| Input **validators** (`*Validator`) | Unit (alongside the handler that uses them) | `*.Command.Tests` / `*.Query.Tests` |
+| A **Domain** class that implements behavior (methods with logic, invariants, calculations) | Unit | `*.Domain.Tests` |
+| A **Controller** endpoint exposing the use case | Functional | `*.WebApi.Tests` |
+
+Notes:
+
+- **Anemic domain entities** (plain data holders with only properties and navigation collections,
+  e.g. [`Scope`](../src/Domain/ArturRios.Heimdall.Domain/Entities/Scope.cs)) carry no
+  behavior and therefore get **no unit tests** — their behavior is observed through the handlers and
+  functional tests. A domain class earns its own unit tests the moment it gains a method that makes
+  a decision (guard clause, state transition, hashing, token validity, etc.).
+- Every use case that reaches the API **must** have functional coverage, even when its handler is
+  already unit-tested. The two layers verify different things (see §6 and §7).
+
+## 4. Solution & project layout
+
+Tests live under a top-level `tests/` directory that **mirrors** the `src/` layer folders. Each
+production project has exactly one corresponding test project, named by appending **`.Tests`** to
+the project name. Each production class has one corresponding test class, named by appending
+**`Tests`** to the class name.
+
+```
+src/
+  Application/
+    ArturRios.Heimdall.Command/           →  CreateScopeCommandHandler.cs
+    ArturRios.Heimdall.Query/             →  GetScopeByIdQueryHandler.cs
+    ArturRios.Heimdall.Shared/            →  ScopeOwnershipChecker.cs
+  Domain/
+    ArturRios.Heimdall.Domain/
+  Infrastructure/
+    ArturRios.Heimdall.Data/              →  Seeding/MasterUserOptions.cs
+  Presentation/
+    ArturRios.Heimdall.WebApi/            →  ScopeController.cs
+
+tests/
+  Application/
+    ArturRios.Heimdall.Command.Tests/     →  CreateScopeCommandHandlerTests.cs
+    ArturRios.Heimdall.Query.Tests/       →  GetScopeByIdQueryHandlerTests.cs
+    ArturRios.Heimdall.Shared.Tests/      →  ScopeOwnershipCheckerTests.cs
+  Domain/
+    ArturRios.Heimdall.Domain.Tests/
+  Infrastructure/
+    ArturRios.Heimdall.Data.Tests/        →  Seeding/MasterUserOptionsTests.cs
+  Presentation/
+    ArturRios.Heimdall.WebApi.Tests/      →  ScopeControllerCreateTests.cs (functional)
+```
+
+Rules:
+
+- **One test project per production project**, `<ProjectName>.Tests`.
+- **One test class per production class under test**, `<ClassName>Tests`, in a namespace that mirrors
+  the production namespace.
+- The test project **must reference the production project it tests** via `<ProjectReference>`
+  (a functional test project references the Web API project; a unit test project references the
+  Application/Domain project it covers).
+- Test projects set `<IsPackable>false</IsPackable>` and are added to the solution under the matching
+  `Tests` solution folder.
+
+## 5. Tooling & packages
+
+Every test project uses the same stack: **xUnit v3** as the test framework, `coverlet.collector` for coverage, **`ArturRios.Util.Test`** for shared helpers & test doubles, **Moq** for mocking, **Bogus** for test-data generation, and **Testcontainers** (`Testcontainers.PostgreSql`) for the functional database.
+
+> The canonical list of these testing technologies **and their pinned versions** lives in the [Technology Stack Document](Technology%20Stack%20Document.md) §7. This section covers *how* to use them; see that document for *what* (packages and versions).
+
+From `ArturRios.Util.Test`, always prefer the provided building blocks instead of rolling your own:
+
+- **Test attributes** (they stamp a `Category` trait so suites can be filtered):
+  - `[UnitFact]` / `[UnitTheory]` → `Category=Unit`
+  - `[FunctionalFact]` / `[FunctionalTheory]` → `Category=Functional`
+  - Each accepts an optional list of `EnvironmentType`s in which the test must **not** run, and an
+    optional skip condition.
+- **`WebApiTest<TEntryPoint>`** — base class for functional tests. Spins up an in-memory host via
+  `WebApplicationFactory<T>`, and exposes:
+  - `Gateway` — an `HttpGateway` for issuing HTTP requests.
+  - `AuthenticateAsync`, `Authorize`, `AuthenticateAndAuthorizeAsync` — for authenticated calls.
+- **`FakeRepository<T, long>`** — in-memory repository test double for unit tests (seed it in *Given*).
+- **`FakeScheduler`** — simulates delayed command/query dispatch.
+- **`CustomAssert`** — extra assertions (`NullOrEmpty`, `NotNullOrEmpty`, `NullOrWhiteSpace`, …).
+
+Beyond the `ArturRios.Util.Test` helpers:
+
+- **Moq** is the **standard mocking library** — use it for every mock/stub of a collaborator that
+  isn't already covered by a purpose-built fake from `ArturRios.Util.Test`. Do not introduce a second
+  mocking framework.
+- **Bogus** is the **standard way to generate test data** — use it whenever a test needs populated
+  entities, commands, or DTOs, instead of hand-writing large object literals or relying on shared
+  mutable fixtures.
+
+> Use `dotnet test --filter "Category=Unit"` or `"Category=Functional"` to run one kind at a time.
+
+### 5.1 Every run records a `.trx`
+
+`tests/Directory.Build.props` points every test project at `tests/default.runsettings`, which enables
+the `trx` logger. An ordinary `dotnet test` therefore writes a result file per project under
+`TestResults/` (git-ignored) and prints its path.
+
+This exists because a console summary is not evidence. A functional test failed once in a
+full-solution run, the summary was the only record, and the failing test's name was lost — the
+failure never reproduced in 23 subsequent runs, so there was nothing left to investigate. A `.trx`
+costs nothing per run and means the next intermittent failure identifies itself.
+
+To chase a failure that only appears occasionally, repeat the run and let the harness collect the
+names:
+
+```bash
+python scripts/flake_hunt.py --runs 25
+```
+
+It runs the whole solution in a loop, stops at the first failing run (`--keep-going` measures a rate
+instead), and prints every test any run recorded as failed. Hunt with the **whole solution** rather
+than a single project: a failure that only appears under the CPU contention of parallel test
+projects will not reproduce from one project alone.
+
+### 5.2 The Command tests use a patient password-hash gate
+
+Production Argon2id is 600 MB and 16 lanes, so the Command tests derive through
+`PasswordHashGate.Shared`, which bounds concurrency at four. A module initializer
+(`Support/CommandTestGate.cs`) replaces it for the whole assembly with a gate of the same permit
+count and a two-minute wait, so a run under CPU or memory pressure queues instead of failing on the
+production ten-second refusal. `PasswordHashGateTests` still pins the production defaults.
+
+## 6. Unit testing standard (Commands, Queries, Domain behavior)
+
+### 6.1 Scope of a unit test
+
+A unit test instantiates the class under test **directly**, passing test doubles for every
+constructor dependency, invokes one method, and asserts the outcome. No web host, no database, no
+network, no real time.
+
+Handlers in this project return an `ArturRios.Output.DataOutput<T>` and report failures **as errors
+on that output** rather than by throwing (see
+[`CreateScopeCommandHandler`](../src/Application/ArturRios.Heimdall.Command/Handlers/CreateScopeCommandHandler.cs)).
+Unit tests therefore assert on `output.Success`, `output.Errors`, `output.Messages`, and
+`output.Data` — not on exceptions (except where the code is genuinely expected to throw).
+
+### 6.2 Test doubles
+
+- Replace **repository** dependencies (`IAsyncReadOnlyRepository<T, long>`, `IAsyncRepository<T, long>`) with
+  `FakeRepository<T, long>` from `ArturRios.Util.Test`, seeded in the *Given* step to represent the
+  database state the scenario assumes.
+- Replace **other collaborators** (validators, mediators, e-mail/token/clock services) with a **Moq**
+  mock configured to return the value the scenario needs (`new Mock<IValidator<T>>()`,
+  `mock.Setup(...).ReturnsAsync(...)`, and `mock.Object` as the dependency). Moq is the single
+  mocking library for the project — don't hand-roll one-off fakes when a purpose-built fake from
+  `ArturRios.Util.Test` doesn't already exist, and don't mix in another mocking framework.
+- Generate any **entities, commands, or DTOs** a scenario needs with **Bogus** (`Faker<T>`), rather
+  than large inline object literals or shared mutable fixtures. Set only the fields the behavior under
+  test actually depends on; let Bogus fill the rest so tests stay focused and independent.
+- The goal is always the same: pin every collaborator to a known result so the only variable is the
+  logic of the method under test.
+
+### 6.3 Structure & naming
+
+- Test method name: **`GivenSomeCondition_WhenSomeAction_ThenSomeOutput`**.
+- Method body is split into three commented sections in order: `// Given`, `// When`, `// Then`.
+- One logical behavior per test. Use `[UnitTheory]` with `[InlineData]`/`[MemberData]` for the same
+  behavior across multiple inputs.
+
+### 6.4 Coverage per handler
+
+For each Command/Query handler, cover:
+
+1. The **main (success) flow** of the use case.
+2. **Every alternative/exception flow** defined for that use case (the `AF-xx` rows in the Use Case
+   Specification). Authorization flows enforced by the framework/middleware (e.g. `403 Forbidden`
+   via `[RoleRequirement]`) are verified in the **functional** tests instead, not here.
+
+Example — UC-01 (Create Scope) has main flow + `AF-01a` (name exists), `AF-01b` (invalid input /
+no owner), `AF-01d` (owner is not a valid `ScopeAdmin`). `AF-01c` (not System Admin) is a functional
+concern. That yields unit tests such as:
+
+```csharp
+using ArturRios.Util.Test.Attributes;
+using ArturRios.Util.Test.Mock;
+using Bogus;
+using FluentValidation;
+using FluentValidation.Results;
+using Moq;
+
+namespace ArturRios.Heimdall.Command.Tests;
+
+public class CreateScopeCommandHandlerTests
+{
+    [UnitFact]
+    public async Task GivenUniqueNameAndValidOwners_WhenHandlingCreateScope_ThenScopeIsCreated()
+    {
+        // Given
+        var scopeReader = new FakeRepository<Scope, long>();
+        var scopeWriter = scopeReader;                     // same in-memory store
+        var roleReader = new FakeRepository<Role, long>();
+        var scopeAdminRole = new Role { Name = nameof(Roles.ScopeAdmin) };
+        roleReader.Create(scopeAdminRole);
+
+        // Bogus builds the collaborator data; set only the fields the behavior depends on.
+        var owner = new Faker<Person>()
+            .RuleFor(p => p.PublicId, _ => Guid.NewGuid())
+            .RuleFor(p => p.RoleId, _ => scopeAdminRole.Id)
+            .RuleFor(p => p.IsDeleted, _ => false)
+            .Generate();
+        var personReader = new FakeRepository<Person, long>();
+        personReader.Create(owner);
+
+        // Moq stubs the non-repository collaborator (the validator).
+        var validator = new Mock<IValidator<CreateScopeCommand>>();
+        validator
+            .Setup(v => v.ValidateAsync(It.IsAny<CreateScopeCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult());          // no failures = valid
+
+        var handler = new CreateScopeCommandHandler(
+            validator.Object, scopeReader, personReader, roleReader, scopeWriter);
+
+        var command = new CreateScopeCommand { Name = "Acme", OwnerIds = [owner.PublicId] };
+
+        // When
+        var output = await handler.HandleAsync(command);
+
+        // Then
+        Assert.True(output.Success);
+        Assert.NotNull(output.Data);
+        Assert.Equal("Acme", output.Data!.Name);
+        Assert.Contains(ScopeMessages.ScopeCreatedSuccessfully, output.Messages);
+    }
+
+    [UnitFact]
+    public async Task GivenScopeNameAlreadyExists_WhenHandlingCreateScope_ThenReturnsNameAlreadyExistsError()
+    {
+        // Given a store already containing a scope named "Acme" …
+        // When handling a CreateScopeCommand for "Acme" …
+        // Then
+        Assert.False(output.Success);
+        Assert.Contains(ScopeMessages.NameAlreadyExists, output.Errors);
+    }
+
+    // GivenInvalidInput_… (AF-01b), GivenOwnerIsNotScopeAdmin_… (AF-01d), etc.
+}
+```
+
+> The example shows the **pattern**: construct the handler with fakes, drive one behavior, assert on
+> `DataOutput`. Adapt the fakes to the collaborators of the handler you are testing.
+
+### 6.5 Domain behavior tests
+
+When a Domain class gains real behavior, unit-test that behavior in `*.Domain.Tests`, same GWT
+pattern, no infrastructure. Test the method's contract: valid inputs produce the expected result;
+invalid inputs are rejected/guarded; boundaries and invariants hold.
+
+## 7. Functional testing standard (Web API)
+
+### 7.1 Scope of a functional test
+
+A functional test is an **end-to-end** test of a use case through the API. It:
+
+1. Starts the Web API host (via `WebApiTest<Program>`).
+2. Points the app at a **real PostgreSQL database** running in a throwaway Testcontainers container.
+3. Issues real HTTP requests through `Gateway`.
+4. Asserts **both**:
+   - the **API response** (HTTP status code, body/`DataOutput` payload, messages/errors), **and**
+   - the **database state** after the operation (row created/updated/deleted, join rows present,
+     `IsDeleted` toggled, etc.).
+
+This is where authorization, routing, model binding, validation wiring, the mediator, EF Core
+mapping, and the database schema are all verified together. The existing
+[`HealthCheckTests`](../tests/Presentation/ArturRios.Heimdall.WebApi.Tests/HealthCheckTests.cs)
+is the reference for the request/response half of this pattern:
+
+```csharp
+public class HealthCheckTests(EnvironmentType environment = EnvironmentType.Local)
+    : WebApiTest<Program>(environment)
+{
+    [FunctionalFact]
+    public async Task GivenApiWorking_WhenHealthCheckEndpointCalled_ThenEndpointReturnsOk()
+    {
+        var output = await Gateway.GetAsync<DataOutput<string>>("/api/healthcheck");
+
+        Assert.Equal(HttpStatusCode.OK, output.StatusCode);
+        Assert.Equal("Hello world!", output.Body?.Data);
+    }
+}
+```
+
+### 7.2 The database: Testcontainers PostgreSQL
+
+Functional tests **must not** use an in-memory EF provider or a developer's local database. They run
+against a real PostgreSQL instance created by Testcontainers at test time, so the environment closely
+matches production (the app uses the PostgreSQL provider — see
+[`Startup.AddDatabase`](../src/Presentation/ArturRios.Heimdall.WebApi/Startup.cs)).
+
+The app reads its connection from environment variables (`HEIMDALL_DATA_CONNECTIONSTRING`,
+`HEIMDALL_DATA_DATABASETYPE`) via `AddDataConfigFromEnvironment<AppDbContext>`. The functional
+suite therefore:
+
+1. Starts a `PostgreSqlContainer` **once for the whole functional suite** (an xUnit
+   `ICollectionFixture`, so the container isn't recreated per test class).
+2. Sets the database up as the supported deployment does (NFR-29): `scripts/sql/new-deployment.sql`
+   creates an owner role and a runtime login, the migrations run as the owner, and the script runs
+   again.
+3. Exports the **runtime login's** connection string into `HEIMDALL_DATA_CONNECTIONSTRING` (and
+   `HEIMDALL_DATA_DATABASETYPE=PostgreSql`) **before** the host is built, so
+   `WebApiTest<Program>` boots against the container as a login that owns nothing, and every
+   functional test also proves the grants cover what it exercises. `PostgresFixture.ConnectionString`
+   stays a superuser's, for arranging and inspecting state; `DatabaseRoleTests` covers the two
+   scripts and what the runtime login is refused (Threat Model TH-18).
+4. **Keeps tests independent by making their data unique, not by resetting the database.** The
+   container's database accumulates rows for the whole run; nothing is truncated between tests and
+   no test runs in a rolled-back transaction. Independence comes from every test seeding its own
+   rows under identifiers no other test can produce — `Guid.NewGuid()` public identifiers,
+   `scope-{Guid:N}` names, `user-{Guid:N}@test.local` addresses — and asserting only about those
+   rows.
+
+   This is a deliberate choice, not an omission. Truncation would delete the roles and the master
+   system administrator that `DatabaseSeeder` writes at startup, which `SeedingTests` and the login
+   tests legitimately depend on, and a per-test transaction cannot wrap work done by the API's own
+   `DbContext` inside the host.
+
+   **What this asks of a new test:** never assert on a global count or an unfiltered query — the
+   only two in the suite (`Roles == 3`, and the master user counted by e-mail) are safe because
+   nothing else can create those rows. Filter every listing by something unique to the test, the way
+   `ScopeControllerViewTests` filters by the scope name it just generated. A test that counts *all*
+   scopes passes alone and fails the moment another class seeds one.
+
+This shared container/fixture is built **once** as test infrastructure; individual use-case tests
+just derive from the functional base class and use it.
+
+```csharp
+// Shared once for the whole functional suite.
+public sealed class PostgresFixture : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
+        .WithImage("postgres:18-alpine")
+        .Build();
+
+    public string ConnectionString => _container.GetConnectionString();
+
+    public async ValueTask InitializeAsync()
+    {
+        await _container.StartAsync();
+        Environment.SetEnvironmentVariable("HEIMDALL_DATA_CONNECTIONSTRING", ConnectionString);
+        Environment.SetEnvironmentVariable("HEIMDALL_DATA_DATABASETYPE", "PostgreSql");
+        // Create the schema by applying the real EF Core migrations — see §10.1.
+        await using var context = new AppDbContext(/* options bound to ConnectionString */);
+        await context.Database.MigrateAsync();
+    }
+
+    public ValueTask DisposeAsync() => _container.DisposeAsync();
+}
+
+[CollectionDefinition(nameof(FunctionalCollection))]
+public sealed class FunctionalCollection : ICollectionFixture<PostgresFixture>;
+```
+
+### 7.3 Structure, naming, and assertions
+
+- Functional test classes derive from `WebApiTest<Program>`, join the functional collection, and use
+  `[FunctionalFact]` / `[FunctionalTheory]`.
+- Same GWT naming and `// Given / // When / // Then` sections as unit tests.
+- Authenticate with `AuthenticateAndAuthorizeAsync` when the endpoint requires a role, and add
+  explicit tests for the authorization alternative flows (`403 Forbidden`, `401 Unauthorized`).
+- In *Then*, assert the response **and** open the database (through the fixture / a scoped
+  `AppDbContext`) to assert the persisted state.
+
+```csharp
+[Collection(nameof(FunctionalCollection))]
+public class ScopeControllerTests : WebApiTest<Program>
+{
+    public ScopeControllerTests(PostgresFixture db) : base(EnvironmentType.Local) { /* seed as needed */ }
+
+    [FunctionalFact]
+    public async Task GivenSystemAdminAndValidPayload_WhenPostScopes_ThenScopeIsCreatedAndReturned()
+    {
+        // Given an authenticated System Admin and an existing ScopeAdmin owner …
+        // When
+        var response = await Gateway.PostAsync<DataOutput<CreateScopeCommandOutput>>(
+            "/api/scopes", new CreateScopeCommand { Name = "Acme", OwnerIds = [ownerPublicId] });
+
+        // Then — response
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal("Acme", response.Body?.Data?.Name);
+
+        // Then — database state
+        // load the Scope + its SCOPE_OWNER rows from the DB and assert they exist as expected
+    }
+
+    // GivenDuplicateName_… → 409 (AF-01a)
+    // GivenInvalidPayload_… → 400 (AF-01b)
+    // GivenNonSystemAdmin_… → 403 (AF-01c)
+    // GivenOwnerNotScopeAdmin_… → 400 (AF-01d)
+}
+```
+
+### 7.4 Coverage per endpoint
+
+For each controller endpoint of the use case, cover the **main flow** and **every alternative flow**
+from the Use Case Specification, including the authorization flows that unit tests deliberately skip.
+
+## 8. Naming & style conventions (quick reference)
+
+| Item | Convention | Example |
+| --- | --- | --- |
+| Test project | `<Project>.Tests` | `ArturRios.Heimdall.Command.Tests` |
+| Test class | `<ClassUnderTest>Tests` | `CreateScopeCommandHandlerTests` |
+| Test method | `Given…_When…_Then…` | `GivenScopeNameAlreadyExists_WhenHandlingCreateScope_ThenReturnsNameAlreadyExistsError` |
+| Unit fact/theory | `[UnitFact]` / `[UnitTheory]` | — |
+| Functional fact/theory | `[FunctionalFact]` / `[FunctionalTheory]` | — |
+| Body sections | `// Given` → `// When` → `// Then` | — |
+
+## 9. Per-use-case workflow (apply every time)
+
+After implementing a use case, do the following before considering it complete:
+
+1. **Identify the artifacts** the use case produced (handlers, validators, domain behavior, endpoints)
+   using the table in §3.
+2. **Create/locate the test projects** that mirror those artifacts' projects (§4), each referencing
+   the project under test, with the standard package set (§5).
+3. **Unit-test each Command/Query handler**: main flow + every applicable `AF-xx` alternative flow,
+   with all collaborators faked/mocked (§6).
+4. **Unit-test any new Domain behavior** (§6.5). Skip anemic entities.
+5. **Functional-test each endpoint** end-to-end against the Testcontainers PostgreSQL database,
+   asserting both response and database state, covering main flow + every `AF-xx`, including
+   authorization flows (§7).
+6. **Name everything** per §8 and write every test in Given/When/Then form.
+7. **Run the suite** (`dotnet test`) and confirm both `Category=Unit` and `Category=Functional` pass.
+8. Only then is the use case done.
+
+## 10. Current test inventory
+
+Every test project uses the standard package set from §5, references the project it tests, and is
+registered in the solution under the `Tests` folder. Six projects mirror the `src/` tree:
+
+| Test project | References | Test classes |
+| --- | --- | --- |
+| `tests/Application/ArturRios.Heimdall.Command.Tests` | `…Command` | Handler tests for every command — `CreateScope`, `UpdateScope`, `DeleteScope`, `HardDeleteScope`, `CreateAdmin`, `CreateUser`, `CreateScopeOwner`, `AddScopeOwner`, `RemoveScopeOwner`, `PromoteScopeUser`, `SetGoogleSignIn`, `GoogleSignIn`, `GoogleSignOut`, `DeleteGoogleUser`, `HardDeleteGoogleUser`, `UpdatePerson`, `DeletePerson`, `HardDeletePerson`, `Login`, `PasswordRecovery`, `ResetPassword`, `VerifyEmail`, `ResendVerificationEmail`, `CreateApplication`, `UpdateApplication`, `DeleteApplication`, `HardDeleteApplication`, `CreateScopePermission`, `UpdateScopePermission`, `DeleteScopePermission`, `HardDeleteScopePermission` — plus the validators that guard them, `EmailVerificationServiceTests`, and `PasswordResetServiceTests` |
+| `tests/Application/ArturRios.Heimdall.Query.Tests` | `…Query` | `GetScopeByIdQueryHandlerTests`, `ListScopesQueryHandlerTests`, `GetPersonByIdQueryHandlerTests`, `ListScopePersonsQueryHandlerTests`, `ListScopeOwnersQueryHandlerTests`, `GetApplicationByIdQueryHandlerTests`, `ListScopeApplicationsQueryHandlerTests`, `GetGoogleUserByIdQueryHandlerTests`, `ListScopeGoogleUsersQueryHandlerTests`, `GetScopePermissionByIdQueryHandlerTests`, `ListScopePermissionsQueryHandlerTests`, `GetDetailedHealthQueryHandlerTests`, `DatabaseHealthCheckTests` |
+| `tests/Application/ArturRios.Heimdall.Shared.Tests` | `…Shared` | `ScopeOwnershipCheckerTests` — the scope-authorization rule shared by UC-06 AF-06e and UC-07 AF-07b |
+| `tests/Domain/ArturRios.Heimdall.Domain.Tests` | `…Domain` | Empty by design — every entity is still anemic, so §3's rule gives them no unit tests |
+| `tests/Infrastructure/ArturRios.Heimdall.Data.Tests` | `…Data` | `Seeding/MasterUserOptionsTests` |
+| `tests/Presentation/ArturRios.Heimdall.WebApi.Tests` | `…WebApi` | One functional class per endpoint group (`ScopeController*`, `PersonController*`, `AuthControllerLogin`, `AuthControllerPasswordRecovery`, `AuthControllerPasswordReset`,
+`AuthControllerVerifyEmail`, `AuthControllerResendVerification`, `AuthControllerGoogleSignIn`, `AuthControllerGoogleSignOut`, `GoogleUserControllerView`, `GoogleUserControllerDelete`, `GoogleUserControllerHardDelete`, `ApplicationController*`, `ScopePermissionController*`, `AuthControllerScopePermissionClaim`, `HealthCheck`), plus `SchemaTests`, `SeedingTests`, the unit-tested `IdentityUserMapperTests` and `MailgunSenderTests`, and `Support/` (`PostgresFixture`, `FunctionalCollection`, `TestTokens`, `TestGoogleTokens`) |
+
+Suite totals as of UC-35: **520 unit** and **428 functional** tests, all passing. Run them separately
+with `--filter "Category=Unit"` / `"Category=Functional"` (see CONTRIBUTING.md).
+
+UC-18 added `UpdateApplicationCommandHandlerTests` and `UpdateApplicationCommandValidatorTests` to
+the Command.Tests project, and `ApplicationControllerUpdateTests` to the functional suite.
+
+UC-25 added `GoogleSignInCommandHandlerTests` and `AuthControllerGoogleSignInTests`, 14 tests each,
+covering both halves of the main flow and AF-25a…AF-25d. Its functional half also added
+`Support/TestGoogleTokens`, and is worth reading before writing tests for UC-26…UC-29, because it
+solves a problem those use cases inherit: **how to test an endpoint whose input is verified by a
+third party.**
+
+`WebApiTest<T>` keeps its `WebApplicationFactory` private and its `Gateway` protected-readonly, so a
+functional test cannot replace a DI registration — every substitution in this suite is chosen at
+start-up from the environment, as `EmailRegistrationExtensions.AddEmailSenders` is. `PostgresFixture` therefore publishes
+`HEIMDALL_GOOGLE_TEST_SIGNING_SECRET`, which makes the host under test resolve
+`LocalGoogleIdTokenVerifier`, and `TestGoogleTokens` mints ID tokens signed with the same secret.
+Without it only AF-25a and AF-25b would be reachable: the main flow, AF-25c, and AF-25d all sit
+behind token verification, and §7.4 asks for every alternative flow.
+
+UC-26 added `GoogleSignOutCommandHandlerTests` (4) and `AuthControllerGoogleSignOutTests` (8),
+covering the main flow and all four shapes AF-26a takes. It is the suite's first endpoint whose
+success writes nothing, so one test on each side asserts the Google User row is **unchanged**
+afterwards — without it, a handler that deleted the account instead of ending its session would pass
+every other assertion.
+
+Its functional half also consumes what UC-25 built: one test signs in through `POST /api/auth/google`
+with a `TestGoogleTokens` ID token and then signs out with the application token that call returned,
+which is the only way to prove UC-26's precondition end to end rather than assume it.
+
+UC-27 added `GetGoogleUserByIdQueryHandlerTests` (9), `ListScopeGoogleUsersQueryHandlerTests` (8),
+and `GoogleUserControllerViewTests` (19). The functional half deliberately covers **both** endpoints
+in one class rather than the usual one-class-per-endpoint split: the thing worth pinning is the
+asymmetry between them — a Google User may read their own record but may never list a scope — and
+splitting the class would put the two halves of that single rule in two files where neither states
+it.
+
+UC-28 added `DeleteGoogleUserCommandHandlerTests` (7) and `GoogleUserControllerDeleteTests` (10).
+Two of the functional tests deliberately reach past the endpoint under test, because **a flag
+nothing honours is not a deletion**: one confirms UC-27's default read stops returning the record
+(FR-GO-17), and one signs an account up through UC-25, deletes it, and confirms the same GoogleId is
+refused a fresh sign-in (AF-25d) without a duplicate row appearing to route around the deletion.
+Asserting only `IsDeleted == true` would have passed against an implementation nothing downstream
+respected.
+
+UC-29 added `HardDeleteGoogleUserCommandHandlerTests` (5) and
+`GoogleUserControllerHardDeleteTests` (9), completing the Google Sign-In milestone. The unit half
+has **no authorization test**, deliberately: UC-29's only actor is the System Admin, the endpoint's
+`RoleRequirement` settles it entirely, and the command carries no acting person — so there is no
+rule at that level to test, and the functional half proves the endpoint enforces it instead. That
+includes an *owning* Scope Admin being refused, which is the whole difference between UC-28 and
+UC-29.
+
+One functional test asserts the scope and its other Google Users survive the deletion. The foreign
+key points from the Google User to the scope, so a cascade in the wrong direction would take
+everything in it — and would be silent in a suite that only checked the deleted row was gone.
+
+The substitute is deliberately **not** a trust-anything stub — a token still needs a valid HS256
+signature, the expected issuer and audience, and an unexpired lifetime, so the suite exercises the
+same verification path a real deployment does and only the signing authority differs. Two guards keep
+it out of production: `GoogleSignInRegistrationExtensions.AddGoogleSignIn` never registers it in the Production environment, and never without
+that variable explicitly set. No `.env` file carries it.
+
+UC-19 added `DeleteApplicationCommandHandlerTests` to the Command.Tests project and
+`ApplicationControllerDeleteTests` to the functional suite. It has no validator test class: the
+command carries no body, so there is no validator to guard — the same shape `DeleteScopeCommand` and
+`DeletePersonCommand` already have.
+
+UC-20 added `HardDeleteApplicationCommandHandlerTests` to the Command.Tests project and
+`ApplicationControllerHardDeleteTests` to the functional suite, and likewise has no validator test
+class. Its unit tests cover only the main flow and AF-20a: UC-20's single actor means authorization is
+settled by `[RoleRequirement]` alone and the command carries no acting person, so every refusal —
+including the Scope Admin who owns the application — is a functional test. The pair also pins the two
+deletions apart: `ApplicationControllerDeleteTests` asserts a repeated call is an idempotent `200`,
+while `ApplicationControllerHardDeleteTests` asserts it is a `404`.
+
+UC-21 added `AddScopeOwnerCommandHandlerTests` to the Command.Tests project and
+`PersonControllerAddScopeOwnerTests` to the functional suite, and has no validator test class — both
+identifiers are route values, so there is no body to guard. It is the first use case whose main flow
+and idempotent alternative flow answer with **different** status codes: AF-21d returns `200` where the
+main flow returns `201`, so the functional pair asserts the two statuses *and* that a second call
+leaves exactly one `scope_owner` row. Contrast UC-19, where AF-19b shares the main flow's `200` and
+only the `AlreadyDeleted` flag separates them (§10.2 covers the harder case, where even the message
+matches).
+
+Its unit tests also pin an ordering guarantee rather than a flow: an actor the ownership checker
+rejects, naming a person who does not exist, must be refused with AF-21c and never AF-21b — the
+authorization answer must not depend on data the caller is not allowed to learn.
+
+UC-22 added `RemoveScopeOwnerCommandHandlerTests` to the Command.Tests project and
+`PersonControllerRemoveScopeOwnerTests` to the functional suite, and likewise has no validator test
+class. It repeats UC-21's ordering test on the inverse operation and adds two shapes of its own:
+
+- **Every refusal asserts the `scope_owner` row survives.** A removal endpoint that answered the
+  right status while still deleting the row would pass a status-only test, so each 403/404/409/401
+  case reads the join row back — from the fake repository at the unit layer, from PostgreSQL at the
+  functional one.
+- **The last-owner guard is tested from both sides of "active".** `GivenSoleOwner_…` covers the plain
+  NFR-12 case, and `GivenOnlyCoOwnerIsLogicallyDeleted_…` and `GivenOnlyCoOwnerIsInactive_…` cover the
+  ones that make the guard's `Person.Active` filter a tested claim: a deleted, restricted or
+  erasure-requesting co-owner does not keep a scope owned, so removing the only active owner is still
+  refused (#211). The mirror case,
+  `GivenLogicallyDeletedTargetWithLiveCoOwner_…`, pins that a deleted *target* is nonetheless
+  removable — the stale row this endpoint exists to clear.
+
+It also contrasts with UC-21 on repetition a third way: `PersonControllerAddScopeOwnerTests` asserts
+a second call is an idempotent `200` and `PersonControllerPromoteScopeUserTests` a `409`, while
+`PersonControllerRemoveScopeOwnerTests` asserts a `404` — the row is gone, so the repeat meets
+AF-22a rather than finding anything to answer for.
+
+UC-23 added `PromoteScopeUserCommandHandlerTests` to the Command.Tests project and
+`PersonControllerPromoteScopeUserTests` to the functional suite, and likewise has no validator test
+class. It repeats UC-21's ordering test and adds two of its own kinds:
+
+- **Ordering between two alternative flows, not just between a flow and authorization.** AF-23d
+  (already a `ScopeAdmin`, 409) is checked before AF-23b (not a `User` of this scope, 400), because
+  every person AF-23d describes also satisfies AF-23b. `GivenPersonAlreadyScopeAdmin_…` would still
+  pass against a handler that answered 400, so it asserts the 409 *and* that the ownership rows the
+  person already held are untouched.
+- **A flow whose condition is easy to state and easy to get wrong.** Promotion moves the address from
+  the scope's `User` namespace into the system-wide admin one, so AF-23e refuses it when a live
+  administrator already holds that address (FR-PE-09). Three tests pin the boundary the flow's wording
+  implies but does not spell out: a live admin holding the address refuses the promotion, a
+  *logically deleted* admin does not, and a `User` of another scope holding it does not either — the
+  last is what makes "the two namespaces are independent" a tested claim rather than a comment.
+
+The pair also contrasts with UC-21 on repetition: `PersonControllerAddScopeOwnerTests` asserts a
+second call is an idempotent `200`, while `PersonControllerPromoteScopeUserTests` asserts it is a
+`409` — the first promotion changed the role, so the repeat meets AF-23d rather than finding nothing
+to do.
+
+UC-24 added `SetGoogleSignInCommandHandlerTests` and `SetGoogleSignInCommandValidatorTests` to the
+Command.Tests project and `ScopeControllerSetGoogleSignInTests` to the functional suite. It is the
+first use case whose command carries a **single** field and still earns a validator test class, and
+the reason is the point of the coverage: `Enabled` is a `bool?` because a plain `bool` would bind a
+body that omits the field to `false` and silently *disable* Google Sign-In (AF-24c). Three tests pin that —
+the validator rejecting `null`, the handler refusing the validation failure, and
+`GivenEmptyBody_WhenPutGoogleSignIn_ThenBadRequestAndFlagIsUnchanged`, which sends `{}` against an
+*enabled* scope so a regression shows up as a flipped row rather than only a changed status code.
+
+Two smaller shapes it contributes:
+
+- **A toggle is tested in both directions.** The main flow is not one test but two — enable and
+  disable — at both layers, because "Enable/Disable" is one endpoint doing opposite things and a
+  handler that ignored the requested value would still pass the enable-only half.
+- **Every refusal asserts the persisted flag, not just the status.** AF-24b's whole content is that
+  an unauthorized actor changes nothing, so each 403/404/400/401 test reads
+  `google_sign_in_enabled` back from the database. The functional helper sends the SRD's wire body
+  (`{ enabled }`) as an anonymous object rather than a serialized command, so the test pins the
+  contract a client uses.
+
+UC-17 also carried a specification correction — application ownership was restricted to a
+`ScopeAdmin` who owns the application's scope — so the UC-16 tests were rewritten rather than merely
+added to. `CreateApplicationCommandHandlerTests` lost its `User`-actor and `SCOPE_USER`-owner cases
+and gained the Scope Admin equivalents; `ApplicationControllerCreateTests` gained the `User`-role
+`403` and the `User`-as-owner `400`. A use-case correction is expected to update the tests that
+pinned the old behaviour, in the same change.
+
+UC-31…UC-35 added 75 unit and 64 functional tests: `CreateScopePermission`,
+`UpdateScopePermission`, `DeleteScopePermission`, and `HardDeleteScopePermission` handler tests plus
+the two validator classes (72 in Command.Tests and Query.Tests), three more cases in
+`IdentityUserMapperTests`, and one functional class per endpoint —
+`ScopePermissionControllerCreate`, `…List`, `…GetById`, `…Update`, `…Delete`, `…HardDelete` — with
+`AuthControllerScopePermissionClaimTests` alongside them. UC-35's unit half has no authorization
+test, for the reason UC-20 and UC-29 don't either: its only actor is the System Admin, so
+`[RoleRequirement]` settles it and the functional half proves it, including an *owning* Scope Admin
+being refused. Three shapes are new here:
+
+- **The claim is tested where it is read, not only where it is written.** `IncludeAsJwtClaim` is a
+  column, and a column nothing reads is not a feature — the same argument UC-28 makes about a
+  deletion flag. `AuthControllerScopePermissionClaimTests` therefore logs in through
+  `POST /api/auth/login` and decodes the issued token, covering all four halves of FR-AU-08: a User
+  gets their scope's flagged names and not the unflagged ones, a Scope Admin gets the union over the
+  scopes they own, a flagged-but-deleted permission is absent, and a System Admin carries no such
+  claim at all. Asserting the flag round-trips through the CRUD endpoints would have passed against
+  an issuer that never consulted it.
+- **A scope-qualified route is tested for the wrong scope, not just the wrong id.** Every read and
+  write has a `GivenScopePermissionOfAnotherScope_…ThenNotFound` case. The permission exists and the
+  caller may be entitled to it in its own scope, so a handler that ignored the route's `scopeId`
+  would answer `200` and leak a resource across a boundary while every unknown-id test still passed.
+- **A permission's deletion state is independent of its scope's.** UC-04 does not cascade to
+  permissions, so both delete endpoints seed a permission inside a logically deleted scope and assert
+  the handler answers from the permission's own flag — `200` with `AlreadyDeleted` for UC-34, a
+  successful purge for UC-35. The pair also repeats the UC-19/UC-20 contrast on a second call: UC-34
+  is an idempotent `200`, UC-35 a `404`.
+
+One create test pins an absence rather than a rule: `GivenDuplicateName_…ThenBothAreCreated`. No
+`FR-SP` requirement makes a permission name unique within its scope, so the test states that on
+purpose — if uniqueness is ever wanted, it is a specification change and this test is what fails
+first.
+
+### 10.1 Functional database
+
+`PostgresFixture` starts a `postgres:18-alpine` container, the PostgreSQL major the deployed
+environments run. It points
+`HEIMDALL_DATA_CONNECTIONSTRING` / `…_DATABASETYPE` at it before the host is built — so the
+suite never touches a developer's local `.env.local` database — and creates the schema by applying
+**the real EF Core migrations** (`context.Database.MigrateAsync()`). Migrations were chosen over
+`EnsureCreated` deliberately: the API refuses to start with migrations pending (see
+`DatabaseSeeder`), and applying them here means the functional suite exercises the same schema
+production gets. `SchemaTests` asserts the result — every table under the `heimdall` schema,
+named in singular snake_case.
+
+`SeedingTests` covers the other half of startup: `DatabaseSeeder` writes the three `Roles` rows and
+the master system administrator, so functional tests can authenticate as a System Admin.
+
+### 10.2 Testing an endpoint that answers the same way twice
+
+UC-12 is the first use case whose alternative flow is *indistinguishable from its main flow* by
+design — AF-12a returns the same 200 and the same message as a successful request, so response
+assertions alone cannot tell them apart. Its tests handle that in two ways, and later
+anti-enumeration work should follow the same shape:
+
+- **Assert the side effect, not the response.** Every functional test opens the database and asserts
+  whether a `password_reset_token` row exists for the person. That row is the only difference
+  between the two paths, so it is the only thing worth asserting.
+- **Compare the two responses directly.** One test issues both requests and asserts the status,
+  messages, and errors are equal. Each other test pins its own path; this one pins the property
+  AF-12a actually states.
+
+The senders are unit-tested with a stub `IEmailService` rather than reached over the network. The
+functional suite leaves the Mailgun variables unset, so the API registers its logging senders and
+never makes an outbound call.
+
+## 11. Verifying the non-functional requirements
+
+Every use case in this document has a stated way of being tested. The non-functional requirements
+had none: of the eighteen, exactly one — NFR-12 — was named anywhere in this specification, and the
+rest were assertions about the system that nothing was obliged to check. Several were true and
+tested by accident. At least three were not true as written, and that only became visible when
+somebody tried to verify them.
+
+An NFR is not always a test. Three verification methods are used here, and naming which one applies
+is half the point: a requirement verified by inspection is not weaker than one verified by a test,
+but a requirement whose method is "none" is not a requirement yet.
+
+- **Test** — executed by the suite. Fails the build when the property stops holding.
+- **Inspection** — established by reading the code or configuration, and re-established when it
+  changes. Used where executing the property would prove less than reading it.
+- **Measurement** — a number produced by a run and published. Not pass/fail: the figure is the
+  output, and the requirement quotes it.
+
+The [Threat Model Document](Threat%20Model%20Document.md) uses these same three methods, and the same
+rule about "none", for the threats behind the security requirements.
+
+### 11.1 Method and status per requirement
+
+| ID | Method | Where | Status |
+| --- | --- | --- | --- |
+| NFR-01 (technology) | Inspection | `Directory.Packages.props`, project files | Verified |
+| NFR-02 (password hashing) | Test | `LoginCommandHandlerTests`, `ResetPasswordCommandHandlerTests` — a stored hash never equals the password, and a reset re-salts | Verified |
+| NFR-03 (signed tokens, configurable expiry) | Test | `AuthControllerLoginTests` reads `expiresAt`; `IdentityUserMapperTests` covers the claim round trip | Verified |
+| NFR-04 (authentication required) | Test | Every controller suite has a no-token case; `ActorLivenessTests` covers the liveness exemption | Verified |
+| NFR-05 (response time) | Measurement + regression ceilings | `ResponseTimeMeasurementTests` for one caller; `scripts/load_test.py` for the 128-caller condition | Measured; see SRD §6.1 and §6.3 |
+| NFR-06 (horizontal scaling) | Test + inspection | `DataProtectionKeyRingTests` for the key ring; inspection for session-free authentication | Verified — and a defect found, see SRD §6.2 |
+| NFR-07 (integrity under logical deletion) | Test | `NonFunctionalRequirementTests` walks every foreign key in the catalogue after UC-04's cascade | Verified |
+| NFR-08 (hard delete cascades a scope) | Test | `HardDeleteScopeCommandHandlerTests`, `ScopeControllerHardDeleteTests` | Verified |
+| NFR-09 (audit trail) | Test | `AuditLoggingTests`, `AuditingCommandHandlerTests` — both outcomes | Verified |
+| NFR-10 (input validation) | Test | Every `*ValidatorTests` class, plus the 400 cases in the controller suites | Verified |
+| NFR-11 (hard delete cascades a person) | Test | `HardDeletePersonCommandHandlerTests` | Verified |
+| NFR-12 (a scope keeps an owner) | Test | UC-09, UC-10, UC-22 and UC-42 suites; `ScopeOwnerRaceTests` — two requests taking out a scope's last two owners at once, one held before its write, leave one refused and an active owner (#202) | Verified |
+| NFR-13 (Google token verification) | Test + inspection | `GoogleIdTokenValidationSettingsTests` pins the audience constraint this application supplies; `LocalGoogleIdTokenVerifierTests` requires the suite's substitute verifier to refuse a wrong signature, issuer, audience or expiry; inspection for Google's own validator | Partly verified — see 11.2 |
+| NFR-14 (hard delete cascades Google Users) | Test | `HardDeleteScopeCommandHandlerTests` | Verified |
+| NFR-15 (no internal ids exposed) | Test | `OpenApiContractTests` over the published document; `SchemaTests` on the shape | Verified |
+| NFR-16 (secrets at rest) | Test | `AuthControllerEnableTwoFactorAuthTests` — the secret is stored encrypted and never returned twice; recovery codes stored as hashes | Verified |
+| NFR-17 (challenge token) | Test | `NonFunctionalRequirementTests` — lifetime, the pending claim, rejection elsewhere, and that the token a login issues expires with the FR-2F-03 code it was issued with rather than before it; `TwoFactorLifetimesTests` pins the same agreement at its source; `AuthControllerVerifyTwoFactorAuthTests` pins the window's two edges and redeems a code in its final seconds | Verified |
+| NFR-18 (password verification cost) | Measurement | `ResponseTimeMeasurementTests` | Measured; see SRD §6.1 |
+| NFR-30 (token issuer and audience) | Test | `TokenIssuerAndAudienceTests` — a correctly signed token under another issuer or audience is refused, and Heimdall's own is accepted, on the bearer path, the subject-rights endpoints, the challenge and UC-57; `TokenOriginTests`, `PersonTokenAudienceTests` and `JwtApplicationTokenServiceTests` for each reader | Verified |
+| NFR-31 (signing keys and secrets) | Test | `TokenSigningKeysTests` — the P-256 key, its base64 form, the empty previous key, and messages that never carry the value; `TokenAlgorithmConfusionTests` — a token's `alg` never chooses the key type, and an HS256 token signed with the retired secret is refused by every reader; `RetiredSecretTests` — with the retired secret still set, an HS256 token is `401`, the key set is served, and start-up warns once per retired variable that is set, naming it and never its value; `JwksEndpointTests` — the published key set and its headers; `TokenOriginTests` for HS256, HS384 and HS512 refused | Verified |
+| NFR-32 (an active System Admin remains) | Test | `DeletePersonCommandHandlerTests`, `HardDeletePersonCommandHandlerTests`, `RequestErasureCommandHandlerTests` and `AnonymiseExpiredDeletionsCommandHandlerTests` — the last active one is not deleted, their erasure is blocked and released once another exists; `SystemAdminRaceTests` — the only two deleting each other at once, in a database of their own, leave one (#203) | Verified |
+
+### 11.2 What this does not cover
+
+Naming the gaps is part of the method; a table of green ticks that hides them is worth less than a
+shorter one that does not.
+
+- **NFR-13's last quarter is still inspection.** Signature, issuer and expiry are checked by
+  `GoogleJsonWebSignature.ValidateAsync` against certificates fetched from Google, and reaching that
+  code in a test would mean contacting Google or holding Google's signing key. What was closed is the
+  part this application decides. The audience is supplied by us, and Google reads a null `Audience`
+  as "do not check the audience" — so dropping the constraint was a one-line change no test could
+  see; `GoogleIdTokenValidationSettingsTests` now sees it. And the substitute verifier the functional
+  suite reaches UC-25 through is itself attacked by `LocalGoogleIdTokenVerifierTests`, because a
+  substitute that waved anything through would make every UC-25 test a report on a system no
+  deployment has. What remains unexecuted is Google's own check, and it stays that way by choice.
+- **NFR-05 and NFR-18 are measured on a developer machine**, not on production hardware, and
+  server-side only. They describe the API's own cost, not what a caller experiences across a network.
+  NFR-18 in particular will be slower wherever there are fewer cores, since Argon2id is configured to
+  use them. The figures also move with load on the measuring machine — a write triples between an
+  idle run and a full-suite one (SRD §6.1) — so a single reading is not a promise, which is why two
+  are published and the budget is set above both.
+- **The load run is not in CI and is not pass/fail on a threshold.** `scripts/load_test.py` needs a
+  deployment to point at and takes minutes, so nothing in the pipeline runs it and no merge is gated
+  on it; SRD §6.3 is a reading somebody took, not a figure a build re-establishes. It is also a
+  closed loop, which makes its latencies optimistic against a fixed-rate arrival, and it is driven
+  over loopback from the same machine that hosts the API, so part of what it measures is the load
+  generator. Compare its runs with each other; do not read them as a service level. The tool does
+  fail the run when a request faults or answers 5xx, which is the part worth being strict about.
+- **The load run covers four endpoints, and its write scenario is off by default.** A liveness check,
+  a paginated read, a scope creation and a login — enough to separate the read path from the write
+  path and to reach the rate limiter, and nowhere near the whole surface. The write scenario needs
+  `--write` because it is the only part that leaves rows behind, and it leaves as many as the API can
+  absorb; the figures it produces are also only valid for the row count it started from (SRD §6.3.2).
+  Nothing here load-tests two-factor verification, Google sign-in, or any deletion.
+- **The rate limiter makes login unmeasurable as throughput.** Ten requests a minute per IP get
+  through, so a load run reports login's *capacity* honestly (SRD §6.3.1) and its throughput not at
+  all. Raising the limit to measure it would measure a deployment nobody runs.
+- **NFR-06 is verified for the state the API keeps, not by running two instances.** The key ring
+  test builds two providers sharing only the database, which is the isolation two containers have,
+  but nothing in CI starts a second replica behind a load balancer.
+
+### 11.3 Adding a non-functional requirement
+
+The same rule as a use case: it does not exist until something checks it. A new NFR needs a method
+chosen from 11.1 and an entry in that table before it is merged. If the method is measurement, the
+requirement quotes the figure and names where it was produced; if none of the three fits, that is a
+sign the requirement is not yet stated in a way anybody could disagree with, and it needs rewriting
+rather than exempting.

@@ -1,0 +1,522 @@
+---
+title: "Data Retention Schedule Document"
+linkTitle: "Data Retention Schedule Document"
+weight: 45
+description: "How long each category of personal data is kept, why, and which periods the API enforces itself."
+---
+
+# Data Retention Schedule Document — Heimdall API
+
+## 1. Purpose
+
+This document states **how long the Heimdall API keeps each category of personal data, and why**.
+It is the record NFR-19 requires, and it is the source of truth the retention passes are configured
+against.
+
+Two obligations make it necessary. GDPR Art. 5(1)(e) and LGPD Art. 15 require that personal data be
+kept in identifiable form no longer than the purpose requires. GDPR Art. 13(2)(a) and Art. 30(1)(f)
+require that the period, or the criteria used to determine it, be *stated* — to the data subject at
+collection, and in the record of processing activities.
+
+The second obligation is the reason this is a document rather than a set of constants. A period that
+lives only in code is not stated to anybody.
+
+> **A period this document states and nothing enforces is marked "not enforced" and names the issue
+> that will enforce it.** A schedule that describes behaviour the system does not have is worse than
+> no schedule, because it is relied upon.
+
+## 2. Scope
+
+Every store that holds personal data — meaning data relating to an identified or identifiable
+natural person (GDPR Art. 4(1), LGPD Art. 5 I). That is the tables in the `heimdall` schema, and
+the stores outside it that copy or record them: the application logs and the database backups.
+
+The two outside the schema are the easiest to forget and among the least bounded, which is why they
+are rows here rather than an operational footnote. A backup in particular is a full copy of every
+category below, and is subject to the same limits as the live database.
+
+`APPLICATION` is out of scope: an application is a non-human identity representing another system.
+Its `OwnerId` points at a person, but the row describes the system, not the owner, and the owner's
+own record is covered below.
+
+## 3. The schedule
+
+| Category | Where it lives | Retention period | Why that period | Enforced |
+| --- | --- | --- | --- | --- |
+| Active identity | `PERSON`, `GOOGLE_USER` | Life of the account | Performance of the service the account exists for. An identity provider cannot authenticate an identity it has deleted | By deletion (UC-09/UC-10, UC-28/UC-29) |
+| Logically deleted identity | `PERSON`, `GOOGLE_USER` where `is_deleted` | **30 days** where the subject asked, **90 days** where an administrator did — §4 | A soft delete is a restriction of processing, not an erasure, so it needs a terminal state. The shorter deadline is the law's, not a choice; the longer one is a reversal window. Both end in anonymisation | ✅ Scheduled anonymisation (§4.4) |
+| Authentication material | `PERSON.password_hash`, `PERSON.salt`, `TWO_FACTOR_AUTH`, `TWO_FACTOR_RECOVERY_CODE` | Life of the account | A security measure under GDPR Art. 32; it lives and dies with the credential it protects. Removed by the cascades of NFR-11 and the `ON DELETE CASCADE` foreign keys | By deletion cascade |
+| Single-use tokens | `PASSWORD_RESET_TOKEN`, `EMAIL_VERIFICATION_TOKEN`, `TWO_FACTOR_EMAIL_CODE`, `APPLICATION_CREDENTIAL` (revoked or expired) | Expiry **+ 7 days** (default, configurable) | §5 | ✅ Scheduled purge (§6) |
+| Pending registrations | `PENDING_REGISTRATION` — the registrant's name, email address, password hash and salt, before any account exists (UC-47) | Until the link is followed, when the row is removed, or until expiry **+ 7 days** (default, configurable) | The registrant asked for an account and has not yet proved the address is theirs. Nothing but the link's hash and the request itself is kept, and the row stops serving its purpose when the link is followed or expires; the grace period is §5's | ✅ Removed on confirmation or when a scope owner discards it (UC-50); scheduled purge otherwise (§6) |
+| Attempt-notice budgets | `ATTEMPT_NOTICE_BUDGET` — a SHA-256 digest of an address that was sent a registration-attempt notice, how many in the current day, and when that day ends (FR-SR-14) | Until the window ends **+ 7 days** (default, configurable) | Held only to cap the notices one address receives at three a day. An ended window counts nothing, so the row has no purpose left; the grace period is §5's, so it goes with the tokens | ✅ Scheduled purge (§6) |
+| Used Google ID tokens | `GOOGLE_ID_TOKEN_USE` — a SHA-256 digest of an accepted Google ID token's `jti` (or of its signed part), and when the token expires (FR-GO-21) | Until the token's expiry **+ 7 days** (default, configurable) | Held only so the same token is refused if presented again. An expired token is refused by its verifier anyway, so after expiry the row guards nothing; the grace period is §5's, so it goes with the tokens | ✅ Scheduled purge (§6) |
+| Scope owner invitations | `SCOPE_OWNER_INVITATION` — who was invited to co-own which scope, by whom, and how it ended (UC-21, UC-58…UC-61) | **90 days** after it ends; an unanswered one, 90 days after it expires | An ended invitation does nothing; ninety days lets an owner see who declined or let it lapse. An invitee's unended invitations are voided, and an inviter cleared, when that person is anonymised | ✅ Scheduled purge (§6) |
+| Audit trail | `AUDIT_LOG` | **18 months** identifiable, then pseudonymised and kept — §7 | Accountability (GDPR Art. 5(2)) needs the trail for as long as a claim could be raised against it. A pseudonymised entry is no longer personal data, so storage limitation stops applying and the forensic value survives | ✅ Scheduled pseudonymisation (§7.1) |
+| Hard-deletion tombstones | `ERASED_SUBJECT` — the `PublicId` of a hard-deleted person or Google User, which table it came from, and when (#195) | Until no audit entry names the id, and **at least 1 day** — §7.2 | Held only so the audit pass can clear the targets that still name a removed person once no row is left to say the id was a person's. The day covers the hard delete's own entry, written just after the row goes | ✅ Removed by the audit pass (§7.2) |
+| Application logs | Serilog file sink, including every request's client IP address | **12 months** — §8 | Security detection lag, not operational debugging: these are the telemetry [#105](https://github.com/artur-rios/heimdall-api/issues/105) reads, and a shorter period deletes the evidence of a breach before anyone knows to look for it | ✅ File sink retention (§8) |
+| Database backups | The backup store, outside the schema | **35 days** (proposed) — §9 | A backup is a full copy of every category above. Longer than the 30-day erasure deadline, which is what makes restore-time reconciliation mandatory | ⚠️ Regime proposed, reconciliation implemented — §9 |
+| Network data | Rate limiter partition key (`RemoteIpAddress`) | The fixed window, in memory only | An IP address is personal data under both laws. As the partition key it is never persisted; the window is one minute and the key is discarded with it. The same address is also written to the application logs, and kept for their period — §8 | By construction |
+| Data Protection key ring | `DATA_PROTECTION_KEYS` | Life of the encrypted material | Not personal data itself, but the TOTP secrets of NFR-16 are undecryptable without it. Listed so nobody purges it as housekeeping | Never purged, deliberately |
+
+Every period is decided and every one is now enforced, with a single qualification: the backup
+regime in §9 is proposed rather than observed, because the repository cannot see the backup
+configuration. The mechanism that makes it safe — reconciling a restore against the erasure ledger —
+is implemented and tested regardless of which retention the controller confirms. That is the rule in §1 working, not an oversight — the alternative is a
+document that reads as though the system already did these things.
+
+Backups are the one row still carrying no number, and deliberately: their period follows from a
+strategy choice §9 sets out, so a figure here would prejudge it.
+
+## 4. Logically deleted identities: two deadlines, because there are two reasons
+
+Setting `IsDeleted` removes an identity from default queries and stops it authenticating. Under both
+laws that is a **restriction of processing**, not an erasure — a legitimate intermediate state, and
+one the system needs. It simply cannot be the terminal one, which is what it is today: nothing
+anywhere removes a soft-deleted row, so a person "deleted" in 2026 is still fully identifiable in
+2036.
+
+The terminal state depends on why the record was deleted, because the two cases rest on different
+legal footing.
+
+### 4.1 The subject asked: 30 days
+
+Not a period chosen here. GDPR Art. 12(3) requires the controller to act on an erasure request
+without undue delay and **at most one month**; LGPD Art. 19 §2 sets 15 days for the confirmation and
+access response that usually accompanies it. Thirty days is the outer limit, not the target — the
+erasure completes as soon as it can, and the deadline is what it must not exceed.
+
+One consequence for the request path: NFR-12 refuses to strip a scope of its last owner, so an
+erasure can be **blocked** by a rule that needs a human to resolve, by transferring ownership. A
+blocked erasure is not an extended one. The deadline keeps running, which means the pending-request
+view has to surface what is overdue rather than merely what is queued.
+
+**The deadline is stored when the request attaches, and the stored value wins.** UC-42 computes it
+at that moment and the anonymisation pass honours it in preference to the configured window, so a
+later change to the configuration cannot move an obligation already owed — forward, which would be
+unlawful, or backward, which would silently mark existing requests overdue.
+
+**A blocked request is still a running one.** Where the block clears, the pass suspends the record
+dated from the *request*, not from the moment the block lifted: dating it from now would hand back
+the whole deadline for a request already outstanding, which is exactly the breach the deadline
+exists to prevent. A long-blocked record is therefore due immediately, which is correct — it is
+already late. UC-43 is the queue that makes such a request visible before it gets there.
+
+### 4.2 An administrator did: 90 days
+
+No subject asked, so the deadline is the controller's own and the purpose is different: a reversal
+window. An administrator who deleted the wrong person needs to undo it, and the client systems in
+that person's scope need time to notice and reconcile.
+
+Ninety days rather than the thirty most consumer services use, because a deletion here is not
+confined to one product: Heimdall is the identity provider every client system authenticates
+against, so one deletion propagates everywhere at once and is correspondingly more expensive to
+discover late.
+
+### 4.3 Both end in anonymisation, not deletion
+
+NFR-07 requires every foreign key in the schema to still resolve after a deletion, and removing the
+row breaks that. Anonymising in place does not: the identifying columns go — `Name` and `Email`
+overwritten, `PasswordHash` and `Salt` zeroed, the behavioural counters reset, and for a Google User
+`GoogleId` and `ProfilePictureUrl` cleared — while the row keeps its structural role. The person's
+single-use tokens and their two-factor configuration go with them, the latter taking its recovery
+codes and email codes by cascade.
+
+That satisfies erasure. GDPR Recital 26 and LGPD Art. 12 both put anonymised data outside the law's
+scope, so an anonymised row is no longer personal data being retained. Hard deletion stays available
+as UC-10 for the cases that genuinely want the row gone.
+
+### 4.4 How the anonymisation runs
+
+`IdentityAnonymisationService` dispatches `AnonymiseExpiredDeletionsCommand` on the same interval as
+the token purge, and the pass shares that one's properties: taken a batch at a time, repeating the
+batch while it comes back full up to `MaxBatchesPerTick` batches a run and reporting what is still due
+when it stops at that cap (§6), needing no coordination between instances, audited so each run leaves the evidence that erasure happened, and
+treating a run with nothing due as a success.
+
+Three things are specific to it.
+
+**The deadline comes from the record, not the pass.** Each row carries `DeletionKind`, and the
+cutoff applied is the one that kind names. A row with no kind — deleted before this mechanism
+existed, and backfilled by the migration — is treated as administrative, because guessing that
+somebody had requested erasure would invent a request that may never have been made and apply the
+shorter deadline to it.
+
+**A row with no `DeletedAt` is skipped, not taken.** A window that cannot be shown to have elapsed
+is not one to act on. The migration backfills `DeletedAt` from `UpdatedAt` for rows deleted before
+the column existed; that proxy is equal to or later than the true deletion, never earlier, so a
+backfilled window closes on time or late and can never erase a record early.
+
+**The dependents go first, and a failure there stops the run.** Anonymising the person while leaving
+their two-factor secret behind would erase the label and keep the material — and the next run would
+never return to it, because it selects on records not yet anonymised.
+
+## 5. Single-use tokens: why the period is expiry plus a grace period
+
+A password reset token, an email verification token, a two-factor email code, and a pending
+registration (UC-47, whose link verifies an address for an account not yet created) all stop
+serving their purpose the moment they expire or are consumed. Storage limitation says to remove
+them, and their retention is the shortest in the schedule.
+
+It is not zero, and the reason is UC-13. A presented token has three distinct outcomes:
+
+| Outcome | When |
+| --- | --- |
+| `TokenInvalid` | No row matches the presented value |
+| `TokenExpired` | The row exists and `ExpiresAt` has passed |
+| `TokenAlreadyUsed` | The row exists and `Used` is set |
+
+Purging on expiry alone collapses the second and third into the first. A person following a link
+from an old email would be told their token never existed, rather than that it ran out — a worse
+answer, and a misleading one. The grace period keeps the truthful answer available for as long as
+anyone plausibly still holds the link, and no longer.
+
+Seven days is the default because the tokens themselves live in minutes or hours, so a week is
+comfortably longer than any link is useful and far shorter than any purpose could justify keeping
+them. It is configurable, and it cannot be set to zero or a negative value — the options type
+refuses both and falls back to the default.
+
+For the four token and registration tables the purge selects on `ExpiresAt <= now - grace`. That
+single condition covers a used row and an expired-unused row alike, and it is the only condition
+applicable to all four of them: neither token table records *when* it was consumed, and only
+`TWO_FACTOR_EMAIL_CODE` and `PENDING_REGISTRATION` carry a `CreatedAt`. Expiry is a sound proxy in any
+case, since each row is issued with a lifetime measured in minutes. Application credentials purge on
+a condition of their own, below.
+
+**A live token is never at risk.** The cutoff is strictly in the past, so a token that has not yet
+expired cannot match however the grace period is configured.
+
+An attempt-notice budget (FR-SR-14) is not a token either. It purges once its window ended at or
+before `now - grace`: an ended window counts nothing, since the next notice to that address starts a
+new one, so the row is a digest of an address with no purpose left.
+
+The record of a used Google ID token (FR-GO-21) purges on the token's own expiry, as the tokens do:
+`ExpiresAt <= now - grace`. Google signs a token for an hour, so the row never outlives the token by
+more than the grace period, and an expired token is refused by the verifier whether or not its use is
+recorded.
+
+A scope owner invitation (UC-21) is not a token either, and its period is its own: 90 days, not the
+grace period. It purges once it ended at or before `now - 90 days` — whether accepted, declined,
+withdrawn or voided — or, when it ran out unanswered and was never ended, once it expired at or before
+that cutoff, so it is the end that starts the clock, and an open invitation is never at risk. The
+period is not configurable.
+
+An application credential (UC-53) is not a single-use token, but once it is revoked or has expired
+it can never be accepted again, so it is kept for the same grace as a spent token and then purged by
+the same pass. Its condition is revoked **or** expired at or before `now - grace`, the grace running
+from whichever came first: expiry alone would never purge a revoked credential that has no expiry. A
+live credential is kept for as long as it is live, since it is in use.
+
+## 6. How the purge runs
+
+A hosted service (`TokenRetentionService`) dispatches `PurgeExpiredTokensCommand` on an interval,
+hourly by default. Three properties are worth stating, because each is a decision rather than an
+implementation detail.
+
+**It is bounded.** Each run takes a table `PurgeBatchSize` rows at a time, oldest first, repeating
+the batch while it comes back full, for at most `MaxBatchesPerTick` batches (#206). SRD §6.3.2
+measured the write path degrading with the size of the table under sustained insert pressure, and a
+purge is sustained *delete* pressure on tables the login and recovery paths write to, so each batch is
+its own short delete rather than one long transaction competing with live traffic. One batch a run
+held a table to 12,000 rows a day at the defaults, which a backlog could outgrow for good; at 20
+batches the ceiling is 240,000. A backlog larger than a run's cap is left for the next, and the run
+reports how many rows are still due, so a backlog that is not draining is visible. The anonymisation
+and audit passes drain the same way.
+
+**It needs no coordination between instances.** NFR-06 requires that no instance assume it is alone,
+and every instance runs its own copy. Nothing is claimed or locked: a run selects a batch, and the
+delete re-reads those ids and removes whatever still exists, so an instance whose rows another
+already removed simply deletes fewer than it selected and reports the true count. Deleting an
+already-deleted row is the only concurrent outcome this pass can have, and it is harmless. The
+alternative — electing one instance to purge — fails in the worse direction, because an instance
+that assumed another was purging would stop purging the moment it ran alone.
+
+**It is audited.** The command is registered like every other, so each run writes one audit entry
+(NFR-09). The entry is as much the point as the deletion: it is the evidence that the schedule was
+enforced, and when. The run is dispatched by a scheduler rather than a caller, so it is recorded as
+an anonymous write.
+
+A run that removes nothing is a success, not a failure — most runs find nothing to do, and treating
+a no-op as an error would fill the trail with refusals that never happened.
+
+The first tick falls one whole interval after start-up, which keeps the purge clear of migrations
+and seeding, and means a container restarting repeatedly never turns start-up into delete pressure.
+A failed run is logged and the loop continues: the pass is maintenance, not part of serving a
+request, and the next tick retries whatever was missed, because a row past its retention period
+stays past it.
+
+## 7. The audit trail: 18 months identifiable, then pseudonymised and kept
+
+`AUDIT_LOG` is where two obligations pull hardest against each other. Accountability (GDPR Art.
+5(2), Art. 32; LGPD Art. 37) is why the trail exists, why it is append-only, and why
+`ActorPersonId` is a bare `PublicId` rather than a foreign key — so an entry survives a hard-deleted
+person. Storage limitation says an indefinitely retained record naming a person who has been erased
+is personal data processed with no remaining basis.
+
+The period settles the first half of that, and the mechanism settles the second.
+
+**Eighteen months identifiable.** Most security baselines land on twelve — PCI DSS requires a year
+of audit history — and breach discovery lag routinely exceeds it, so twelve is a floor rather than a
+comfortable answer. Eighteen covers a full compliance cycle plus that lag. Beyond it, the
+accountability value of *who acted* falls away sharply while the value of *what happened, when, and
+how often* does not — and that half survives pseudonymisation intact.
+
+**Then pseudonymised, and kept indefinitely.** Once neither `ActorPersonId` nor a person `TargetId`
+resolves to a natural person the entry is not personal data (Recital 26, LGPD Art. 12), so storage
+limitation stops applying to it and the trail keeps its shape, ordering and correlation for as long
+as it is useful.
+
+**Pseudonymised in place, and never deleted.** The pass sets the attribution, and any person target,
+to `NULL` on the entry itself; nothing else in the row changes. It can do only that because the
+trigger described in §7.1 permits only that, and only once due. `DELETE` and `TRUNCATE` stay refused
+outright, so no entry can be removed however old it is, and Threat Model TH-18 stays closed: the
+append-only guarantee was narrowed by exactly these two clearings, not dropped or worked around.
+
+**A person target goes with the attribution.** An entry names a person through its `TargetId` as
+well as through its actor: for a command somebody runs on their own account the target is their own
+`PublicId`, and for an administrator's action on a person it is that person. Such an entry stays
+personal data about the target for as long as their `PERSON` or `GOOGLE_USER` row is identifiable,
+whoever acted. So a target naming a person or Google User is cleared on the same two grounds as the
+actor — the attribution period has elapsed, or that identity has been anonymised (#184). A target
+naming anything else (a scope, an application, a credential, a permission) is not personal data and
+is kept as recorded.
+
+**So does the target of a hard-deleted person (#195).** A hard delete (UC-05's members, UC-10,
+UC-29) removes the row, but not the id: the entries about that person, and the hard delete's own
+entry, still carry it, and anything holding a copy of the old row — a backup inside its window, an
+export, a log line — can still resolve it. So it stays personal data. With the row gone, though,
+nothing in the database could tell the id was a person's, and the trigger refused to clear it as
+"names no person". Each hard delete therefore writes the id to `ERASED_SUBJECT` before the row goes,
+and a target whose id is there and which no `PERSON` or `GOOGLE_USER` row has any more is cleared on
+the pass's next run, at any age — the person is gone, which is the outcome an anonymisation only
+approximates. A tombstone whose row is still there (a delete that failed after writing it) is no
+ground at all. An id that resolves to nobody and was never tombstoned — a hard-deleted scope's, or a
+person's removed before tombstones existed — is still kept, because nothing says it was ever a
+person's; the ids of persons hard-deleted before #195 were never recorded and cannot be cleared.
+
+**Erasure does not wait for the clock.** When a data subject is erased under §4, the entries they
+produced lose their attribution, and the entries about them lose their target, on the pass's next
+run — the same mechanism, triggered by the erasure rather than by eighteen months elapsing.
+
+One consequence worth stating plainly rather than discovering later: an **active** person's entries,
+and the entries about them, are pseudonymised at eighteen months while they are still an active
+person. That caps how far back a current account can be investigated. It is the intended trade-off of storage limitation, and it is
+recorded here so it is a decision rather than a surprise.
+
+### 7.1 How the pseudonymisation runs, and why the database enforces it
+
+`AuditRetentionService` dispatches `PseudonymiseAuditActorsCommand` on the same interval as the
+other passes, selecting entries whose attribution period has elapsed **or** whose actor has been
+anonymised, and on the same two grounds, entries whose target names a person or Google User — past
+the period, or that identity anonymised — and, at any age, entries whose target is a tombstoned id
+that no `PERSON` or `GOOGLE_USER` row has any more. Each entry has only what is due cleared: a
+recent entry by a live administrator about an erased person loses its target and keeps its actor.
+The run reports both counts, and the tombstones it removed (§7.2). It shares the other passes'
+properties: bounded per run, needing no coordination between instances, audited, and treating an
+empty run as a success.
+
+What is different is where the rule lives. The pass does not decide what it is allowed to write —
+**the database does**, through the trigger installed by `AllowClearingAuditActor` and widened by
+`AllowClearingAuditTarget` and `AllowClearingErasedSubjectTarget`:
+
+| Operation | Permitted |
+| --- | --- |
+| `DELETE`, `TRUNCATE` | Never |
+| `UPDATE` changing any column other than the attribution and the target | Never |
+| `UPDATE` setting the attribution to a *different* identity | Never |
+| `UPDATE` clearing the attribution, entry older than 30 days | Yes |
+| `UPDATE` clearing the attribution, actor anonymised | Yes, at any age |
+| `UPDATE` clearing the attribution, recent entry, live actor | Never |
+| `UPDATE` setting the target to a *different* value, or setting one where there was none | Never |
+| `UPDATE` clearing a target that names no `PERSON` or `GOOGLE_USER` row and is not in `ERASED_SUBJECT` | Never |
+| `UPDATE` clearing a target that names no `PERSON` or `GOOGLE_USER` row and is in `ERASED_SUBJECT` (a hard-deleted person) | Yes, at any age |
+| `UPDATE` clearing a person target, entry older than 30 days | Yes |
+| `UPDATE` clearing a person target, that person anonymised | Yes, at any age |
+| `UPDATE` clearing a person target, recent entry, live person | Never |
+
+Each part is judged on its own, and an unchanged part is accepted, so the pass can clear one without
+the other; a statement clearing both succeeds only if both are due. The application cannot clear an
+attribution or a target early, reassign either, or alter anything else, because the database refuses
+all three whatever the code asks. That matters more here than elsewhere: this is
+the one table whose immutability was a security control (Threat Model TH-18), and a control the
+application could talk its way around would not be one.
+
+The thirty-day floor is an **anti-tamper backstop, not a retention period**. The retention period is
+eighteen months and lives in configuration; the floor exists so that somebody who has just acted
+cannot immediately clear their own attribution, or the person they acted on, to cover it. The
+erasure branch carries no age condition, for the actor or the target, because a subject-requested
+erasure completes thirty days after the request and the entries it produced, or that concern the
+person, days earlier have to go with it.
+
+**What this narrows, stated honestly.** Before, nothing could change in this table at all. Now two
+things can: the attribution, and a target that names a person — on record, or tombstoned by a hard
+delete. The guarantee that remains is
+narrower but still precise: *an action can never be denied, and who took it, or which person it was
+taken on, can never be reassigned — only forgotten.* Non-repudiation of the act survives
+intact; attribution, and the naming of a person it was taken on, is what becomes time-limited, which
+is exactly what storage limitation requires of it.
+
+### 7.2 Tombstones of hard-deleted identities
+
+`ERASED_SUBJECT` holds one row per hard-deleted person or Google User: the `PublicId`, which of the
+two it was, and when the row was written. Nothing else about the person. It is a processing record
+of the deletion, held for one purpose — to let §7.1 clear the targets that still name the id — and
+it goes once that purpose is spent.
+
+**Written first.** UC-10, UC-29 and UC-05 (for each member person and Google User it removes) write
+the tombstone before they delete anything. UC-10 and UC-05 write it in the same transaction as the
+deletes, so a delete that fails takes the tombstone with it (#212). UC-29's is a single row before a
+single delete; if that delete fails, the tombstone names a live row, which neither the pass nor the
+trigger acts on. The write is idempotent: a retried hard delete
+records the id again without error, keeping one row and moving its `created_at` to the retry. The
+table accepts a row only for a person or Google User that exists when it is written (#195, R1), so a
+tombstone cannot be planted for any other id to make its targets clearable; the Threat Model, §6.1,
+gives the reasoning.
+
+**Removed by the audit pass, on two conditions.** After clearing, the same run removes each
+tombstone that is older than **one day** and that no audit entry names as its target any more,
+bounded per run like the clearing. The day covers the hard delete's own audit entry, which the
+auditing decorator writes just after the handler returns: until it lands, nothing names the
+tombstone, and removing it then would leave that entry naming the person for good. A tombstone named
+by an entry the run's batch did not reach waits for a later run. In practice a tombstone lives a day
+or a little more.
+
+## 8. Application logs: why 12 months, and on what condition
+
+Twelve months rather than the ninety days an operational-debugging period would justify, because
+debugging is not what these logs are for. The audit trail is the record of what the API *did*; the
+application logs are the telemetry a breach is detected from, and
+[#105](https://github.com/artur-rios/heimdall-api/issues/105) makes that explicit by reading them.
+
+Breach discovery is routinely measured in months rather than weeks. A ninety-day period would
+therefore delete the evidence of an incident before anyone knew to look for it, which is the one
+outcome a security log must not have — and GDPR Art. 33's seventy-two-hour clock starts at
+*awareness*, so a log that expired before awareness never contributed to meeting it.
+
+**The condition, and how it was met.** Twelve months is defensible for logs that identify a person
+only by `PublicId`. It was not defensible for the logs as they stood, which carried raw email
+addresses — `MailgunSender` wrote the recipient on every verification, reset and 2FA email, and
+`DatabaseSeeder` wrote the master administrator's address at every start-up. Quadrupling the life of
+a file full of addresses would have been a larger exposure than the shorter period it replaced, not
+a smaller one.
+
+So the two halves were ordered, and the order was not negotiable: **the redaction landed with the
+retention limit, in one change.** No log statement writes an address now. Where a line needs to
+refer to one so an operator can correlate — whether three failures are one address retrying or three
+people — it writes a stable, non-reversible reference instead (`LogSafeEmail`). That is
+pseudonymisation rather than anonymisation, and the honest limit is that somebody who already
+suspects a particular address can hash it and look; what it defeats is bulk harvesting.
+
+**IP addresses are the exception, and a deliberate one.** Every request is logged with its client IP
+address, in clear, since Privacy Notice 1.2. It is the one identifier the logs carry that is not a
+`PublicId` or a reference, and it is there because it is the security telemetry: the source of a
+credential-stuffing run, or the address a compromised account was used from, is what a breach
+investigation asks first, and a reference could not be matched against a block list or a provider's
+abuse report. It is kept for the logs' twelve months and removed with them, on legitimate interests
+(the Data Protection Document's network row). Behind a reverse proxy it is the caller's address only
+when `HEIMDALL_TRUSTED_PROXIES` names the proxy; otherwise it is the proxy's, and identifies nobody.
+The same middleware also tags the address on the request's trace activity (`client.address`). Nothing
+exports traces, so that copy never leaves memory and ends with the request; adding a trace exporter
+would change that, and needs this schedule and the Privacy Notice updated first.
+
+The seeder simply stopped logging the address. It came from the environment the operator set, so the
+line told them nothing they did not know, and it was written on every start-up for the life of the
+deployment.
+
+**The sink shape had to change for the limit to mean anything.** It was wrapped in `WriteTo.Map`
+keyed per month, which creates a *new sink per month* — a retention limit bounds files within one
+sink, so it bounded each month's directory and never removed a month. Files from the first month a
+deployment ran were still on disk years later. It is now a flat rolling sink with
+`retainedFileTimeLimit`, which is the shape where the limit applies. The year/month directory layout
+is gone as a result.
+
+## 9. Database backups: why the period is bounded, not chosen
+
+A backup is a full copy of every category in §3, so it inherits all of their limits at once. It also
+creates the one failure that makes every other row in this document theoretical:
+
+> **An erasure that the next restore silently undoes is not an erasure.**
+
+Backups are not edited. Editing them destroys the integrity that is their entire purpose, and no
+backup regime worth running permits it. That left exactly two workable answers:
+
+1. **Backup retention shorter than the shortest erasure deadline**, which §4 now fixes at **30
+   days**. An erased record cannot survive in a backup past the deadline, because the backup holding
+   it is gone first. Simple, and it needs no reconciliation — but it caps disaster recovery at 30
+   days, which for most operators is far too short.
+2. **A restore re-applies every erasure completed since the backup was taken.** Keeps the backups as
+   long as recovery needs, at the cost of a step that must run on every restore and must be tested
+   like any other part of the recovery procedure.
+
+**Option 2 was taken**, with a proposed 35-day retention. The direction of the constraint is why:
+a regime keeping backups longer than 30 days — which is nearly every regime — makes the
+re-application step mandatory rather than optional, and choosing option 1 by default and discovering
+later that recovery needs ninety days is how an erasure quietly comes back. Committing to the
+reconciliation up front means the retention can be whatever recovery actually needs.
+
+The mechanism is in
+[§0.1 of the Operations & Infrastructure Document](Operations%20%26%20Infrastructure%20Document.md),
+along with the runbook step. In short: the anonymisation pass logs the identifiers it anonymised —
+a ledger that survives outside the database, which is what a restore cannot roll back — and a
+System Admin replays it afterwards. Only backups predating a request need it; where the backup was
+taken after, the restored row still carries its deadline and the scheduled pass finishes the job
+unaided.
+
+Backup encryption belongs to the same issue and is not restated here.
+
+## 10. Configuration
+
+| Variable | Default | Accepted range | Meaning |
+| --- | --- | --- | --- |
+| `HEIMDALL_RETENTION_TOKEN_GRACE_DAYS` | `7` | more than 0, up to 3650 | Days a single-use token is kept past expiry |
+| `HEIMDALL_RETENTION_PURGE_INTERVAL_MINUTES` | `60` | 1 to 10080 (7 days) | Interval between purge runs |
+| `HEIMDALL_RETENTION_PURGE_BATCH_SIZE` | `500` | any positive integer | Rows a pass takes from one table per batch |
+| `HEIMDALL_RETENTION_MAX_BATCHES_PER_TICK` | `20` | any positive integer | Most batches a pass takes from one table per run |
+| `HEIMDALL_RETENTION_PURGE_ENABLED` | `true` | `true` / `false` | Set `false` to stop scheduling the purge |
+| `HEIMDALL_RETENTION_ERASURE_DEADLINE_DAYS` | `30` | more than 0, up to 30 | Days before a requested erasure is anonymised |
+| `HEIMDALL_RETENTION_DELETION_WINDOW_DAYS` | `90` | more than 0, up to 730 | Days before an administrative deletion is anonymised |
+| `HEIMDALL_RETENTION_ANONYMISATION_ENABLED` | `true` | `true` / `false` | Set `false` to stop scheduling the anonymisation |
+| `HEIMDALL_RETENTION_AUDIT_ACTOR_DAYS` | `548` (18 months) | 30 to 3650 | Days an audit entry stays attributed |
+| `HEIMDALL_RETENTION_AUDIT_PSEUDONYMISATION_ENABLED` | `true` | `true` / `false` | Set `false` to stop scheduling it |
+| `HEIMDALL_RETENTION_LOG_DAYS` | `365` (12 months) | 1 to 3650 | Days a log file is kept before the sink removes it |
+
+The erasure deadline is the one setting with a ceiling that is not a sanity check: 30 days is the
+statutory limit, so a larger value is not a policy choice but a compliance failure, and it is
+refused rather than applied.
+
+The other ranges are enforced too, and each bound is there for a reason. A grace period beyond ten years is a
+stray unit rather than a policy. An interval below a minute turns the purge into continuous delete
+pressure on the tables the login path writes to; one above seven days is past what `PeriodicTimer`
+accepts, and the exception it would throw inside the hosted service stops the host by default — so
+without the ceiling, a stray digit in a retention setting would take the API down.
+
+Every value has a default that is safe to run with, because a deployment that sets none of these
+must still enforce a period: an unset variable meaning "keep forever" is precisely the state NFR-19
+exists to end.
+
+A malformed or out-of-range value falls back to the default and is named in a start-up warning,
+rather than failing start-up. Refusing to start would turn a typo in a retention setting into an
+outage of the identity provider every client system authenticates against — a far worse failure than
+running on the documented default for one interval. Falling back *silently* would be worse than
+either, since an operator would believe a setting was applied, so the warning names each variable it
+ignored.
+
+Switching the purge off is a deliberate deployment decision and is logged as a warning, because it
+leaves personal data in place past its retention period.
+
+## 11. Reviewing this document
+
+The schedule is reviewed when:
+
+- a migration adds or removes a column holding personal data;
+- a new category of data subject or recipient appears;
+- one of the "not yet enforced" rows is implemented, at which point its row states the period and
+  the mechanism and drops the marker;
+- the [record of processing activities](Data%20Protection%20Document.md) is reviewed, since GDPR Art.
+  30(1)(f) requires the periods to appear there too — that document satisfies it by reference to this
+  one, so the two are reviewed together;
+- a new store outside the schema starts holding personal data, or an existing one changes what it
+  holds — §8's twelve months rests on the logs no longer carrying addresses, and a change that put
+  them back would invalidate the period without touching a single table;
+- the backup or recovery regime changes, since §9's two answers trade against the recovery window
+  and a longer window can turn the reconciliation step from optional into mandatory.
+
