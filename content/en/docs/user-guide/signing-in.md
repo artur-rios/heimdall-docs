@@ -74,7 +74,7 @@ Screen: `/login`. Actors: anyone who is not signed in, and Google users.
 This works only if the UI build has a Google client ID and the scope has Google
 Sign-In switched on (see [Scopes]({{< relref "/docs/user-guide/scopes" >}})). How
 a build is told which scope it acts in is described in
-[Architecture]({{< relref "/docs/architecture#configuration-and-secure-storage" >}}).
+[The target scope]({{< relref "/docs/application#the-target-scope" >}}).
 
 Signing in:
 

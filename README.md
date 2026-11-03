@@ -4,8 +4,9 @@ The home page and documentation portal for
 [Heimdall](https://github.com/artur-rios/heimdall-api), a centralized identity
 management system with scope-based multi-tenancy: an ASP.NET Core API and the
 Flutter application that drives it. This site explains what Heimdall is, how it
-is put together, how to run it, and how to use it. The API's internals live on
-the [heimdall-api site](https://docs.artur-rios.tech/heimdall-api/).
+is put together, how to run it, and how to use it, and it holds the detailed
+documentation of the API and of the application, with the specification
+documents of both. It is the single documentation site for Heimdall.
 
 **[docs.artur-rios.tech/heimdall-docs](https://docs.artur-rios.tech/heimdall-docs/)**
 
@@ -19,6 +20,26 @@ package.
 | [heimdall-api](https://github.com/artur-rios/heimdall-api) | The ASP.NET Core identity API. |
 | [heimdall-ui](https://github.com/artur-rios/heimdall-ui) | The Flutter application for web, Windows, Linux and Android. |
 | [heimdall-docs](https://github.com/artur-rios/heimdall-docs) | This site. |
+
+## Content the site does not own
+
+Four paths hold files copied from the code repositories. The yggdrasil `sync`
+feature rewrites each of them wholesale, with a commit straight to this
+repository's `main`, whenever the repository it comes from is released (a push to
+its `main` whose checks passed). A change made to them here is lost at the next
+release, so **they must not be edited by hand**. To change one, change its
+source in the code repository.
+
+| Path in this repository | Copied from | Shown on the site as |
+|---|---|---|
+| `content/en/docs/api/requirements/documents/` | `docs/requirements/` in heimdall-api | The API requirements |
+| `content/en/docs/application/requirements/documents/` | `docs/requirements/` in heimdall-ui | The application requirements |
+| `static/api/openapi/heimdall.json` | `docs/openapi/heimdall.json` in heimdall-api | The API explorer and the OpenAPI document |
+| `static/api/coverage-report/` | The coverage report that heimdall-api's `test` check archives (`docs/coverage-report/`) | The test coverage page |
+
+Every other page is written here by hand. The CHANGELOG and CONTRIBUTING files of
+the code repositories are not rendered on the site; its pages link to them on
+GitHub.
 
 ## Running it locally
 
@@ -76,9 +97,20 @@ heimdall-docs/
 │   ├── _index.md             # landing page
 │   ├── about/                # the about page
 │   └── docs/                 # the documentation
+│       ├── overview/ architecture/ installation/ user-guide/ integrating/ repositories/
+│       ├── api/              # the API: reference, explorer, flows, operations, coverage, status
+│       │   └── requirements/documents/   # copied from heimdall-api (sync-owned)
+│       └── application/      # the UI: scope, environments, signing, status
+│           └── requirements/documents/   # copied from heimdall-ui (sync-owned)
+├── layouts/
+│   ├── _markup/              # the link render hook for the copied documents
+│   └── _shortcodes/          # swagger-ui, for the API explorer
+├── static/api/
+│   ├── openapi/heimdall.json # the OpenAPI document (sync-owned)
+│   └── coverage-report/      # the coverage report (sync-owned)
 ├── docs/
 │   ├── fact-sheet.md         # the cited facts the pages are written from
-│   └── superpowers/          # the design spec and the plan the site was built from
+│   └── superpowers/          # the design specs, the plans, and the contradictions found
 ├── i18n/en.toml              # footer text
 ├── scripts/
 │   ├── check_site.py         # post-build site checker
