@@ -12,15 +12,6 @@ or the [`.http` files or Bruno collection](../../installation/#calling-the-api) 
 
 This page is the map — what exists, who may call it, and which use case it implements.
 
-{{% alert title="Not every operation is listed here" color="warning" %}}
-The OpenAPI document has 79 operations and this page does not cover six of them:
-`POST /api/auth/register`, `POST /api/auth/2fa/challenge/resend`,
-`POST /api/auth/erasure-reconciliation`, `PUT /api/scopes/{id}/self-registration`,
-`PUT /api/scopes/{id}/email-links` and `GET /api/healthcheck/ready`. Find their request and response
-shapes in the [API explorer](../explorer/), which is complete; where the two disagree, the OpenAPI
-document is right.
-{{% /alert %}}
-
 ## Reading the "Who" column
 
 | Notation | Meaning |
@@ -43,6 +34,7 @@ Two rules apply everywhere and are not repeated per row:
 | `POST /login` | Anonymous | UC-11 — password login; answers a token, or a challenge token if 2FA is active |
 | `POST /password-recovery` | Anonymous | UC-12 — request a reset link |
 | `POST /password-reset` | Anonymous | UC-13 — set a new password from the token |
+| `POST /register` | Anonymous | UC-47 — sign up as a password `User` in a scope with self-registration open; `202` with the same message whether the address is free or taken, and no `User` exists until the mailed link is followed (UC-14); `403` for a missing, deleted or closed scope |
 | `POST /verify-email` | Anonymous | UC-14 — confirm an address from the mailed token |
 | `POST /resend-verification` | Authenticated (self) | UC-15 — retire outstanding links, mail a fresh one; `429` when the account-email budget refuses it (cooldown or daily limit); rate-limited |
 | `POST /google` | Anonymous | UC-25 — Google sign-up/sign-in against a scope; each ID token is accepted once (FR-GO-21), and a used one answers `401` as an invalid one does. A verified token is spent even when the call then fails (`403`, `409`, `5xx`), so get a fresh one from Google for every attempt, retries included |
@@ -50,6 +42,7 @@ Two rules apply everywhere and are not repeated per row:
 | `POST /2fa/enable` | Authenticated (self) | UC-36 — begin 2FA setup; needs `currentPassword` (`401` otherwise); with `Email`, `429` when the account-email budget refuses it |
 | `POST /2fa/confirm` | Authenticated (self) | UC-37 — confirm setup, receive recovery codes |
 | `POST /2fa/verify` | Anonymous | UC-38 — redeem the challenge token with a second factor |
+| `POST /2fa/challenge/resend` | Anonymous (the challenge token, in the body) | UC-46 — mail a fresh email code for an outstanding challenge; `200` with the same message on every path, and the challenge's window never lengthens |
 | `POST /2fa/disable` | Authenticated (self) | UC-39 — turn 2FA off |
 | `POST /2fa/recovery-codes/regenerate` | Authenticated (self) | UC-40 — issue a fresh set of ten |
 | `GET /2fa` | Any authenticated | FR-2F-15 — the caller's own two-factor status; 403 for a Google User |
@@ -58,6 +51,7 @@ Two rules apply everywhere and are not repeated per row:
 | `POST /processing-restriction` | Any authenticated (self) | UC-44 — suspend processing without deleting, on an Art. 18(1) ground |
 | `POST /processing-restriction/lift` | Self, or System Admin for another | UC-45 — lift it; an admin must inform the subject first |
 | `GET /erasure-requests` | System Admin | UC-43 — the outstanding erasure requests, soonest deadline first |
+| `POST /erasure-reconciliation` | System Admin | NFR-25 — re-apply erasure to the identities a database restore brought back, named in `subjectIds` from the erasure ledger; answers how many it anonymised, how many already were, and the ids it did not find |
 
 Every **anonymous** endpoint here is rate-limited to **10 requests per minute per IP**. Each of them
 checks a credential, and none is protected by a token — see
@@ -92,6 +86,8 @@ even after the restriction is lifted, when the subject signs in again for a full
 | `DELETE /{id}` | System Admin | UC-04 — logical delete (cascades to Users, Google Users, applications, all or nothing; repeating it finishes a cascade left unfinished) |
 | `DELETE /{id}/hard` | System Admin | UC-05 — hard delete (also purges permissions and join rows), all or nothing |
 | `PUT /{id}/google-signin` | System Admin + Scope Admin | UC-24 — turn Google Sign-In on or off |
+| `PUT /{id}/self-registration` | System Admin + Scope Admin | UC-47 (FR-SR-02) — open or close anonymous self-registration |
+| `PUT /{id}/email-links` | System Admin + Scope Admin | No use case — point the scope's verification and password-reset emails at a client's own screens; each link is an absolute `http` or `https` address of up to 2048 characters, and one left out, null or empty is cleared so the global one applies ([Operations](../operations/#pointing-a-scope-at-a-client-applications-screens)) |
 | `GET /{id}/pending-registrations` | System Admin + Scope Admin | UC-49 — the self-registrations awaiting confirmation, newest first: name, address, expiry, guesses left; never the hash, salt or token |
 | `DELETE /{id}/pending-registrations/{registrationId}` | System Admin + Scope Admin | UC-50 — discard one; its link then answers "Invalid token" and the registrant may sign up again |
 
@@ -208,11 +204,12 @@ A Scope Admin is refused — the trail has no scope column to divide it by.
 | Method & path | Who | Use case |
 | --- | --- | --- |
 | `GET /api/healthcheck` | Anonymous | UC-30 — liveness; the process is up (no database read) |
+| `GET /api/healthcheck/ready` | Anonymous | No use case — readiness: `200` while the database answers, `503` when not; the bare status only, held for five seconds |
 | `GET /api/healthcheck/detailed` | System Admin | UC-30 — per-dependency status |
 
-The API also answers both at the root, `/healthcheck` and `/healthcheck/detailed`, for the container
-health check and yggdrasil's status page, which call it on its own port. Behind Traefik, only the
-`/api/` addresses reach it from the web UI's host.
+The API also answers all three at the root, `/healthcheck`, `/healthcheck/ready` and
+`/healthcheck/detailed`, for the container health check and yggdrasil's status page, which call it on its
+own port. Behind Traefik, only the `/api/` addresses reach it from the web UI's host.
 
 ## Signing keys — `/.well-known/jwks.json`
 
