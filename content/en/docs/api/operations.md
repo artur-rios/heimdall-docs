@@ -666,9 +666,11 @@ guard `public_id` alone, so these columns are writable by the API's own role.
 
 {{% alert title="Not a substitute for a gateway" color="warning" %}}
 The limiter's partition key is the connection's remote IP — the real caller's only when
-`HEIMDALL_TRUSTED_PROXIES` names the proxy in front of the API
-([Client addresses behind a proxy](#client-addresses-behind-a-proxy)). Without it, **every caller
-shares the proxy's partition**. This is a per-instance, defence-in-depth
+`HEIMDALL_TRUSTED_PROXIES` names the proxy in front of the API and, behind Cloudflare,
+`HEIMDALL_CLOUDFLARE_PROXIED` is `true`
+([Client addresses behind a proxy](#client-addresses-behind-a-proxy)). Without the first, **every
+caller shares the proxy's partition**; without the second, every visitor arriving through one
+Cloudflare edge shares that edge's. This is a per-instance, defence-in-depth
 throttle — not a replacement for a WAF or an API gateway's own rate limiting in front of a real
 deployment. The per-account budgets above are in the database, so they hold across instances.
 {{% /alert %}}
@@ -1275,6 +1277,35 @@ so the rightmost entry is the only one it vouches for, and an earlier entry a ca
 ignored. Never list a range a caller can originate from — anything trusted here can claim any
 address it likes. `X-Forwarded-Host` is not read; nothing in the API decides on the host name.
 
+### Behind Cloudflare
+
+With Cloudflare's proxy in front of Traefik, that last hop is a Cloudflare edge address, which
+unrelated visitors share: they would land in one rate-limit bucket, under an address that identifies
+none of them. `HEIMDALL_CLOUDFLARE_PROXIED=true` says Cloudflare is there. Before the
+forwarded-headers middleware reads `X-Forwarded-For`, the API reduces it to the entry just left of
+the last one, which is the one Cloudflare appended, so the rate limiter and the request log both see
+the visitor:
+
+| Request | `X-Forwarded-For` at the API | Counted as |
+| --- | --- | --- |
+| Visitor through Cloudflare | `visitor, edge` | The visitor |
+| Forged entry through Cloudflare | `forged, visitor, edge` | The visitor |
+| Client reaching Traefik directly | `client` (Traefik discards what it sent) | The client |
+| Connection from outside `HEIMDALL_TRUSTED_PROXIES` | Anything | The connection |
+
+Only `true`, in any letter case, turns it on, and it does nothing unless `HEIMDALL_TRUSTED_PROXIES`
+names the proxy too. Unset, the last entry is the caller, as above.
+
+{{% alert title="Only when Traefik keeps the header from Cloudflare alone" color="warning" %}}
+Traefik must keep `X-Forwarded-For` from Cloudflare's address ranges only
+(`forwardedHeaders.trustedIPs`) and discard it from anywhere else. A proxy that appends to whatever
+any client sent puts a forged entry in the position this setting reads, so a caller could choose the
+address it is rate limited and logged under.
+{{% /alert %}}
+
+With it on, the request log holds visitors' own addresses where it held edge addresses, for the same
+12 months ([Data Retention Schedule, §8](../requirements/documents/data-retention-schedule-document/)).
+
 ## Integrations
 
 ### Email delivery (Mailgun)
@@ -1515,6 +1546,7 @@ no longer verify HS256.
 | `HEIMDALL_METRICS_PORT` | | `9464`; `0` → metrics off |
 | `HEIMDALL_CORS_ALLOWED_ORIGINS` | | unset → every cross-origin request is refused |
 | `HEIMDALL_TRUSTED_PROXIES` | | unset → forwarded headers ignored; every caller is the proxy |
+| `HEIMDALL_CLOUDFLARE_PROXIED` | | unset → the last `X-Forwarded-For` entry is the caller; `true` → behind Cloudflare, the entry Cloudflare appended is |
 | `HEIMDALL_TRUSTED_CALLER_KEYS` | | unset → no client system may name its users' addresses; keys under 32 characters stop start-up |
 | `HEIMDALL_GOOGLE_CLIENT_IDS` | | unset → Google sign-in refuses every token |
 | `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` | | unset → tokens logged (fails start-up in Production) |
