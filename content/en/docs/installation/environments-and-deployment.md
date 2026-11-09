@@ -410,7 +410,10 @@ What the templates already set, and how the three differ:
 All three set `DB_HOST=host.docker.internal` and `HEIMDALL_TRUSTED_PROXIES=172.16.0.0/12` — Traefik
 reaches the container from yggdrasil's `edge` network, so forwarded addresses are believed from the
 Docker range and from nobody else — and leave `HEIMDALL_CORS_ALLOWED_ORIGINS` empty, since
-heimdall-ui calls the API under its own origin.
+heimdall-ui calls the API under its own origin. They also set `HEIMDALL_CLOUDFLARE_PROXIED=true`:
+Cloudflare's proxy is in front of Traefik, and Traefik keeps `X-Forwarded-For` from Cloudflare's
+ranges only (`CLOUDFLARE_PROXIED=true` in yggdrasil's `platform.env`). With no Cloudflare in front,
+set it to `false` ([Behind Cloudflare](../../api/operations/#behind-cloudflare)).
 
 `scripts/ygg.sh config heimdall-api` on the VPS opens the file of the environment it asks for and
 redeploys with it.
@@ -488,6 +491,7 @@ For a PostgreSQL on another machine, put its private address in `DB_HOST` and re
 | `relation "role" already exists` on the second run | The login is named `heimdall`, so `"$user"` resolves to the entities' schema | Rename the login, or keep `Search Path=public` in every connection string |
 | Browser front end gets a CORS error | `HEIMDALL_CORS_ALLOWED_ORIGINS` is empty | List the front end's origin exactly as the browser sends it |
 | Every request is logged from the same address, and callers hit 429 together | `HEIMDALL_TRUSTED_PROXIES` does not cover the proxy | Set it to the address or network the proxy connects from ([Client addresses behind a proxy](../../api/operations/#client-addresses-behind-a-proxy)) |
+| Behind Cloudflare, the log shows only Cloudflare's addresses, and unrelated visitors hit 429 together | `HEIMDALL_CLOUDFLARE_PROXIED` is not `true`, so the address read is a Cloudflare edge's | Set it to `true`, once the proxy keeps `X-Forwarded-For` from Cloudflare's ranges only ([Behind Cloudflare](../../api/operations/#behind-cloudflare)) |
 | `docker compose ps` shows nothing (local) | `--env-file` omitted, so `COMPOSE_PROJECT_NAME` is unset | Pass the env file on every Compose command |
 | `docker compose ps` shows nothing (VPS) | The project is named after the environment | `docker compose -p heimdall-api-<environment> ps` |
 | `heimdall-api-dev.example.com` answers 404 | Development is stopped, so Traefik has no router for it | `scripts/ygg.sh env start development` |

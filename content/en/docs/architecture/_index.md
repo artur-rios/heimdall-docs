@@ -311,7 +311,8 @@ around it: the metrics scrape branch (on its own port, ahead of everything — s
 [Metrics](../api/operations/#metrics--prometheus)), forwarded headers and HTTPS redirection go in
 front through a startup filter, and the rate limiter goes after it. `TraceActivityMiddleware` logs
 every request with the caller's IP address — the real caller's when `HEIMDALL_TRUSTED_PROXIES` names
-the proxy in front of the API, the proxy's otherwise.
+the proxy in front of the API and, behind Cloudflare, `HEIMDALL_CLOUDFLARE_PROXIED` is `true`; the
+proxy's, or a Cloudflare edge's, otherwise.
 
 {{% alert title="Why Swagger sits between the two middlewares" color="info" %}}
 `Startup.Build()` registers `ExceptionMiddleware`, then `UseSwagger()`, then
