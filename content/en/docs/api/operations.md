@@ -1095,8 +1095,8 @@ grep -h SECURITY_SIGNAL /path/to/logs/log-*.json
 
 Detection that tells nobody is not detection: **both breach notification clocks run from awareness**,
 so a signal sitting in a log file has not been detected. This job is what closes that. It reads the
-log files, finds the signals it has not reported before, and mails them to one address through the
-Mailgun account the API already uses.
+log files, finds the signals it has not reported before, and mails them to one address through
+Hermes, under a client of its own.
 
 ```bash
 python3 scripts/security_signals.py --stdout      # see what it would send, change nothing
@@ -1108,40 +1108,52 @@ python3 scripts/security_signals.py --stdout --all  # ignore the watermark, prin
 | --- | --- | --- |
 | `HEIMDALL_LOG_DIRECTORY` | If not `./logs` | Where the API writes `log-*.json` — the same variable the API reads |
 | `HEIMDALL_SIGNAL_ALERT_TO` | Yes, unless `--stdout` | Where alerts go |
-| `HEIMDALL_SIGNAL_ALERT_FROM` | No | Sender, default `heimdall-signals@$MAILGUN_DOMAIN` |
 | `HEIMDALL_SIGNAL_STATE_FILE` | No | The watermark, default `<log directory>/.security-signals-state` |
-| `MAILGUN_API_KEY`, `MAILGUN_DOMAIN` | Yes, unless `--stdout` | The API's own credentials, unchanged |
-| `MAILGUN_API_BASE_URL` | No | Default `https://api.mailgun.net`. Set the EU endpoint here if the account is in the EU region |
+| `HERMES_BASE_URL` | Yes, unless `--stdout` | Hermes at its internal alias, e.g. `http://hermes-api.production:8080` |
+| `HEIMDALL_SIGNAL_HERMES_API_KEY` | Yes, unless `--stdout` | The key of this job's own Hermes client. It never falls back to the API's `HERMES_API_KEY` |
+
+**It needs its own Hermes client.** Hermes counts messages per client and answers 429 over a limit,
+until midnight UTC for the daily one. Under Heimdall's client, the flood of email that raises a
+signal could use up the day and refuse the alert about it. Add a client to each environment's Hermes:
+
+| Setting | Value |
+| --- | --- |
+| Identifier | `heimdall-signals` |
+| Sender | `heimdall-signals@<mail domain>`. Hermes fixes the sender per client, so the job does not set one |
+| Recipient policy | `fixed`, listing only `HEIMDALL_SIGNAL_ALERT_TO`. Any other address is answered 403 and the job exits 1 |
+| Limits | 5 a minute and 200 a day. A run sends one message, so a fifteen-minute schedule sends at most 96 |
+
+Outside Production Hermes holds no Mailgun credentials: it logs the message and accepts it, so the
+watermark moves and no alert arrives.
 
 **Scheduling it.** Every fifteen minutes matches the monitoring window's default, so nothing waits
-longer to be reported than it waited to be detected:
+longer to be reported than it waited to be detected. Use `--quiet`, which keeps the ordinary no-signal
+run silent.
 
-```cron
-MAILTO=you@example.com
-*/15 * * * * cd /srv/heimdall && /usr/bin/python3 scripts/security_signals.py --quiet
-```
+The job **exits non-zero when it cannot deliver**, and prints the signals it was holding to stderr —
+so a broken collector announces itself instead of looking like a quiet week, but only to something
+that is listening. **Whatever schedules it has to report a non-zero exit somewhere a person looks.**
+Cron's `MAILTO` does that only on a host with a mail program, and yggdrasil's hosts are not installed
+with one.
 
-The `MAILTO` is not decoration. The job **exits non-zero when it cannot deliver**, and prints the
-signals it was holding to stderr — so a broken collector announces itself instead of looking like a
-quiet week. Without a `MAILTO`, the failure of the thing that catches failures is itself uncaught.
-`--quiet` keeps the ordinary no-signal run silent, so the only mail cron sends is a real problem.
-
-**It needs to read the log files.** `docker-compose.yml` keeps them in a *named* volume
-(`logs:/app/logs`), which the host cannot read directly — so run the job against that volume rather
-than against a host path:
+**It has to run in a container on the edge network.** Hermes has no published port, so it is reachable
+only as `hermes-api.<environment>:8080` from that network. The log files are in a *named* volume
+(`logs:/app/logs`), which the job reads by sharing the API container's volumes. Run it as the user
+whose rootless Docker engine runs the API:
 
 ```bash
 docker run --rm \
-  --volumes-from heimdall-api \
+  --network edge \
+  --volumes-from heimdall-api-<environment>-api-1 \
   -e HEIMDALL_LOG_DIRECTORY=/app/logs \
-  -e HEIMDALL_SIGNAL_ALERT_TO -e MAILGUN_API_KEY -e MAILGUN_DOMAIN \
+  -e HEIMDALL_SIGNAL_ALERT_TO -e HERMES_BASE_URL -e HEIMDALL_SIGNAL_HERMES_API_KEY \
   -v "$PWD/scripts:/scripts:ro" python:3-slim \
   python3 /scripts/security_signals.py --quiet
 ```
 
-The alternative is to change the volume to a bind mount and run the job on the host, which is
-simpler to schedule and puts the logs somewhere a backup can reach them. Either works; what does not
-work is scheduling it on the host and pointing it at a path the container owns.
+**A report too long for one message** — Hermes refuses a body over 10,000 characters — keeps every
+count, lists the newest signals that fit, and gives the `--stdout --all --since` command that prints
+the rest. Those signals count as reported.
 
 The state file is written next to the logs by default, so it survives in the volume. Point
 `HEIMDALL_SIGNAL_STATE_FILE` somewhere writable if the log directory is read-only — and somewhere
@@ -1159,8 +1171,9 @@ folder within a week, and a filtered alert is the same non-detection the job exi
 
 Two details follow from that, and both are the conservative direction:
 
-- **The watermark advances only after delivery succeeds.** A Mailgun outage delays signals rather
-  than consuming them.
+- **The watermark advances only after delivery succeeds.** Anything but Hermes's `202` — a refusal, a
+  limit, an outage of Hermes or Mailgun — delays signals rather than consuming them. The next run is
+  the retry.
 - **An unreadable state file is treated as a first run**, so the history is re-reported. Noisy, and
   the alternative — a truncated file silently meaning "everything is already handled" — is detection
   switching itself off without saying so.
