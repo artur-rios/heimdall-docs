@@ -16,7 +16,7 @@ disableKinds = ["taxonomy", "term"]
     # `locale` and `languages.*.label` arrived in 0.158.0.
     min = "0.158.0"
   [[module.imports]]
-    path = "github.com/google/docsy"
+    path = "github.com/docsy/docsy/theme"
 
 [markup]
   [markup.goldmark.renderer]
@@ -46,19 +46,17 @@ disableKinds = ["taxonomy", "term"]
   github_branch = "main"
   offlineSearch = true
 
-  [params.mermaid]
+  # Mermaid is one of Docsy's plugins, with its settings on the plugin's entry:
+  # Docsy 0.18 refuses to build with a `params.mermaid` table. It loads only on
+  # a page with a diagram.
+  [params.docsy.plugins.mermaid]
     enable = true
-    # Docsy v0.15.0's loader predates Mermaid 12; "latest" would pick it up.
+    # Pinned here rather than left to the theme's own pin, so that a theme
+    # upgrade does not also re-render every diagram with a different Mermaid.
     version = "11.17.2"
-    # Draw diagrams at natural size; the stylesheet lets wide ones scroll.
-    [params.mermaid.flowchart]
-      useMaxWidth = false
-    [params.mermaid.sequence]
-      useMaxWidth = false
-    [params.mermaid.class]
-      useMaxWidth = false
-    [params.mermaid.state]
-      useMaxWidth = false
+    # Mermaid's own configuration, as a JSON string: draw diagrams at natural
+    # size; the stylesheet lets wide ones scroll.
+    options = '{"flowchart": {"useMaxWidth": false}, "sequence": {"useMaxWidth": false}, "class": {"useMaxWidth": false}, "state": {"useMaxWidth": false}}'
 
   [params.ui]
     showLightDarkModeMenu = true
