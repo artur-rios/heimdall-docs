@@ -9,8 +9,7 @@ It fails when:
 3. an internal link or asset does not resolve to a built file, points
    outside the site's base path, or names an #anchor the target page
    does not have;
-4. the Hugo build log holds a warning or error other than the two
-   deprecations Docsy v0.15.0 triggers under current Hugo;
+4. the Hugo build log holds a warning or error;
 5. the content directory is missing, or the content still holds
    placeholder text (the upper-case markers TODO, TBD and FIXME, or
    "lorem ipsum" in any case).
@@ -28,14 +27,6 @@ import tomllib
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlsplit
-
-# Docsy v0.15.0's templates call two APIs Hugo has since deprecated. They
-# are warnings, not failures, and go away when the Docsy pin can be lifted
-# (see the readme). Anything else Hugo warns about is a real problem.
-KNOWN_DOCSY_WARNINGS = (
-    "deprecated: .Language.LanguageDirection",
-    "deprecated: .Site.AllPages",
-)
 
 # The markers are case-sensitive on purpose: "Todo" is a real GitHub project
 # status and "to-do" is ordinary prose. Only the shouted forms are leftovers.
@@ -122,7 +113,7 @@ def check_pages(public: Path, base_url: str, required: list[str]) -> list[str]:
 def check_build_log(text: str) -> list[str]:
     errors = []
     for line in text.splitlines():
-        if line.startswith(("WARN", "ERROR")) and not any(k in line for k in KNOWN_DOCSY_WARNINGS):
+        if line.startswith(("WARN", "ERROR")):
             errors.append(f"hugo: {line.strip()}")
     return errors
 

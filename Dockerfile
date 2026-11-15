@@ -12,12 +12,17 @@
 #                    only allows names that start with HUGO_). The site does not read them today.
 #
 # Different from the template:
-#   1. The theme (Docsy) is a Hugo Module (go.mod, pinned to v0.15.0 on purpose, see the README), so the build needs the
-#      Go toolchain. The hugomods images have no variant with both Go and Node, and Docsy's PostCSS pipeline needs Node
-#      (package.json), so the Go toolchain is copied from the pinned golang image into the Node variant. go.mod asks for
-#      Go 1.26.7 or newer, which is newer than the Go of the hugomods images. The image has no git, so Hugo fetches the
-#      module from proxy.golang.org (HUGO_MODULE_PROXY) and go.sum pins its hash. Nothing in the site reads the git
-#      history (enableGitInfo is off), so .git is not in the build context.
+#   1. The theme (Docsy) is a Hugo Module (go.mod, github.com/docsy/docsy/theme), so the build needs the Go toolchain.
+#      The hugomods images have no variant with both Go and Node, and the theme's npm packages need Node (below), so the
+#      Go toolchain is copied from the pinned golang image into the Node variant. go.mod asks for Go 1.26.7 or newer,
+#      which is newer than the Go of the hugomods images. The image has no git, so Hugo fetches the module from
+#      proxy.golang.org (HUGO_MODULE_PROXY) and go.sum pins its hash. Nothing in the site reads the git history
+#      (enableGitInfo is off), so .git is not in the build context.
+#
+#      Bootstrap and Font Awesome are npm packages of the theme, which `hugo mod npm pack` writes into the
+#      packages/hugoautogen workspace of package.json, and Docsy compiles its SCSS with Dart Sass, which Hugo runs as
+#      `sass` from the PATH: the sass-embedded package of package.json. `npm ci` installs them all from
+#      package-lock.json, and the build puts node_modules/.bin on the PATH.
 #   2. The site is checked before it is served, as the Deploy workflow did before it published: the checker's own tests,
 #      then scripts/check_site.py (required pages, internal links and anchors, unexpected Hugo warnings, placeholder
 #      text), given the build log and the address the site is built for. A site that fails the check is not built into
@@ -34,9 +39,11 @@ ENV HUGO_MODULE_PROXY=https://proxy.golang.org
 
 WORKDIR /src
 
-# The PostCSS toolchain on its own, so a change to a page does not install it again.
+# The npm packages on their own, so a change to a page does not install them again.
 COPY package.json package-lock.json ./
+COPY packages/ packages/
 RUN npm ci --no-audit --no-fund
+ENV PATH="/src/node_modules/.bin:${PATH}"
 
 COPY . .
 
@@ -47,8 +54,8 @@ ARG YGG_ENVIRONMENT=
 ENV HUGO_GIT_COMMIT=${GIT_COMMIT} \
     HUGO_YGG_ENVIRONMENT=${YGG_ENVIRONMENT}
 
-# The build log is kept for the checker. A build that writes no output is the failure mode the Docsy pin exists for, and
-# it does not fail the Hugo command (see the README), hence the test of index.html.
+# The build log is kept for the checker. A build that writes no output does not fail the Hugo command (Docsy v0.16.0 as
+# a module did that, see the README), hence the test of index.html.
 RUN set -eu; \
     if [ -n "$PUBLIC_HOST" ]; then base="https://$PUBLIC_HOST$PUBLIC_PATH/"; else base="$PUBLIC_PATH/"; fi; \
     printf '%s' "$base" > /tmp/base-url; \

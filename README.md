@@ -43,19 +43,26 @@ GitHub.
 
 ## Running it locally
 
-**Requirements:** [Hugo extended](https://gohugo.io/installation/) 0.158 or
-newer — the configuration uses `locale` and `languages.*.label`, which arrived
-in that release; the site image builds with 0.165.0 — the [Go toolchain](https://go.dev/dl/)
-— Docsy is consumed as a Hugo Module — and Node with npm, for Docsy's PostCSS
-pipeline. Python 3.11 or newer is needed only for the checks below (the checker
+**Requirements:** [Hugo extended](https://gohugo.io/installation/) 0.160.1 or
+newer — the minimum of Docsy v0.18.1; the site image builds with 0.165.0 — the [Go toolchain](https://go.dev/dl/)
+— Docsy is consumed as a Hugo Module — and Node with npm, for the theme's Bootstrap
+and Font Awesome and for Dart Sass. Python 3.11 or newer is needed only for the checks below (the checker
 imports `tomllib`).
 
 ```bash
 git clone https://git.techcraftsmen.net/artur-rios/heimdall-docs.git
 cd heimdall-docs
 npm ci
+export PATH="$PWD/node_modules/.bin:$PATH"
 hugo server
 ```
+
+Hugo runs Dart Sass, which Docsy compiles its SCSS with, as `sass` from the
+`PATH`; `npm ci` installs it as the `sass-embedded` package, hence the `export`.
+On Windows, npm also installs the pure-JavaScript `sass` package, whose `sass`
+command shadows the embedded one and cannot serve Hugo: put
+`node_modules/sass-embedded-win32-x64/dart-sass` on the `PATH` instead, or
+[install Dart Sass](https://gohugo.io/functions/css/sass/#dart-sass).
 
 The site is then at <http://localhost:1313/heimdall-docs/>.
 
@@ -90,7 +97,9 @@ python -m unittest discover -s scripts -p "test_*.py"
 heimdall-docs/
 ├── hugo.toml                 # site configuration
 ├── go.mod                    # the Docsy theme, as a Hugo Module
-├── package.json              # autoprefixer + postcss-cli
+├── package.json              # Dart Sass (sass-embedded), autoprefixer, postcss-cli
+├── package-lock.json
+├── packages/hugoautogen/      # the theme's npm packages (`hugo mod npm pack`)
 ├── assets/scss/
 │   └── _styles_project.scss  # light/dark code-block styles, diagrams, tables
 ├── content/en/
@@ -130,26 +139,23 @@ alongside it without restructuring.
 
 ## Updating the theme
 
-`go.mod` currently pins Docsy to v0.15.0 on purpose. v0.16.0 moved the actual
-theme (`layouts/`, `assets/`) into a git submodule that Go's module zip does
-not include, so it resolves as a Hugo Module but builds no output.
-
-**v0.16.0 was checked on 2026-08-24, in the sibling alexandria-docs site, and the
-fault was unchanged.** It resolves, then fails at build with `template for
-shortcode "blocks/cover" not found` and writes no `public/`. Later releases
-(v0.18.0 at the time of writing) have not been verified here. The pin stays
-until one is.
-
-Bumping the version therefore needs a real check, not just a green `go get`:
+Docsy is the Hugo Module `github.com/docsy/docsy/theme`, at the version in
+`go.mod`. Since v0.16.0 the theme declares Bootstrap and Font Awesome as npm
+packages, which `hugo mod npm pack` writes into the `packages/hugoautogen`
+workspace of `package.json`. Moving the theme is therefore four commands, not
+one, or the stylesheets are built against the previous theme's Bootstrap:
 
 ```bash
-hugo mod get -u github.com/google/docsy
+hugo mod get github.com/docsy/docsy/theme@<version>
+hugo mod npm pack
+npm install
 hugo --minify
 ```
 
-Only commit the resulting `go.mod` and `go.sum` once that build has actually
-produced `public/index.html` — an empty or missing `public/` means the new
-version is broken the same way v0.16.0 was, and the pin should stay.
+Commit `go.mod`, `go.sum`, `package.json`, `package-lock.json` and
+`packages/` once that build has produced `public/index.html` without a
+warning. Run `hugo mod npm pack` again after any change to `package.json`
+too: Hugo warns that the npm dependencies are out of sync until it has.
 
 ## Deployment
 

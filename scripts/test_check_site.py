@@ -73,11 +73,13 @@ class CheckPagesTests(unittest.TestCase):
 
 
 class CheckBuildLogTests(unittest.TestCase):
-    def test_known_docsy_deprecations_pass(self):
-        log = ("WARN  deprecated: .Language.LanguageDirection was deprecated in Hugo v0.158.0\n"
-               "WARN  deprecated: .Site.AllPages was deprecated in Hugo v0.156.0\n"
-               "Total in 900 ms\n")
-        self.assertEqual(check_site.check_build_log(log), [])
+    def test_clean_log_passes(self):
+        self.assertEqual(check_site.check_build_log("Start building sites\nTotal in 900 ms\n"), [])
+
+    def test_deprecation_warning_fails(self):
+        # Docsy v0.15.0's two deprecations were allowed until the theme moved on; v0.18.1 triggers none.
+        log = "WARN  deprecated: .Site.AllPages was deprecated in Hugo v0.156.0\n"
+        self.assertEqual(len(check_site.check_build_log(log)), 1)
 
     def test_other_warning_fails(self):
         self.assertEqual(len(check_site.check_build_log("WARN  found no layout file\n")), 1)
