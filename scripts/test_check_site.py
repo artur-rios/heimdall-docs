@@ -416,6 +416,19 @@ class MainTests(TempDirTestCase):
         self.assertEqual(self.run_main(),
                          (1, [f"ERROR: {md.as_posix()}:1: placeholder text: TBD", "check_site: 1 problem(s)"]))
 
+    def test_given_a_console_without_utf8_when_an_error_holds_other_characters_then_they_are_escaped(self):
+        md = write(self.root, "content/en/a.md", "﻿TODO 日本語\n")
+        argv = ["--public", str(self.root / "public"), "--content", str(self.root / "content"),
+                "--required", str(self.root / "required.txt"), "--base-url", BASE]
+        console = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")  # a Windows console's code page, strict
+        with contextlib.redirect_stdout(console):
+            code = check_site.main(argv)
+        console.flush()
+        self.assertEqual((code, console.buffer.getvalue().decode("cp1252").splitlines()), (1, [
+            f"ERROR: {md.as_posix()}:1: placeholder text: \\ufeffTODO \\u65e5\\u672c\\u8a9e",
+            "check_site: 1 problem(s)",
+        ]))
+
     def test_given_problems_in_every_check_when_run_then_reports_them_in_check_order(self):
         write(self.root, "public/index.html", '<a href="gone/">x</a>')
         write(self.root, "hugo.log", "ERROR render failed\n")

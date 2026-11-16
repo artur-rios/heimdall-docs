@@ -135,6 +135,12 @@ def _base_url_from_config() -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # A console that is not in UTF-8 (a Windows code page) cannot show every character a page, log or path may
+    # hold: escape those as \uXXXX instead of failing with UnicodeEncodeError.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
+
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--public", type=Path, default=Path("public"))
     parser.add_argument("--build-log", type=Path)
